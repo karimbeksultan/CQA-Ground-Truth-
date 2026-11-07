@@ -47,6 +47,25 @@ from 1 over the original transcript array (the model and the UI use the same num
 `critical_flag` equals `critical` without zeroing the total. If a criterion is replaced in the UI
 at the control step, keep its id (c01…c08) so the file keeps the 8 codes the format requires.
 
+## Deploy (public demo link)
+
+The repo ships a `Dockerfile` and a Render blueprint (`render.yaml`). On Render: **New + → Blueprint →**
+this repository, then fill the secret values in the dashboard:
+
+| variable | value |
+|---|---|
+| `CQA_API_URL` | the organizers' GET link without `&group_id=...` |
+| `GEMINI_API_KEY` | Google AI Studio key |
+| `CQA_BASIC_AUTH` | `login:password` for the jury (the whole app is behind HTTP Basic; `/api/health` stays open) |
+
+On boot the container imports DEV from the organizer API and shows the committed
+`results/dev/results.json` (marked as its source); new evaluations from the UI run live through the engine
+chain. The local Ollama fallback exists only on a machine that runs Ollama (the laptop), not in the cloud.
+
+Engine chain (`CQA_ENGINES`, first = primary): `gemma-4-31b-it` → `gemini-3.5-flash` → `gemini-3.8-flash` →
+`gemini-3-flash-preview` → `gemini-2.5-flash` → local `ollama:qwen3:1.7b`. Every fallback is recorded on
+the evaluation and in `results.json` (`model.name`, `mode`).
+
 ## Run the server
 
 ```bash

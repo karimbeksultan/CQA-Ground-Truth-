@@ -97,6 +97,17 @@
   94.1% criterion agreement, total MAE 3.17; chats 95.2% / MAE 2.74, calls 80% / 8.40.
   `results/dev/results.json` exported and validated (`check-results --group DEV`: 65, 0 errors).
 
+- **Second improvement pass (2026-11-07, night):** remaining panel findings closed —
+  - local Ollama is the last link of the engine chain (offline last resort, fast fail when absent);
+  - N/A must cite the turn that shows the condition (5 of 520 DEV entries had none);
+  - design: set summary with the per-criterion strip and drill-down to dialogs that lost points,
+    self-hosted Onest (Kazakh) + Unbounded score figures, two-row toolbar, mobile overflow fixed;
+  - deployment: Dockerfile + render.yaml, HTTP Basic for a public link, `seed-demo` shows the committed
+    DEV results on a fresh server, `load-run` shows any CLI run in the UI;
+  - **control-hour dry run from a fresh clone**: install, 113 tests, seed-demo (65 dialogs from the API in
+    9 s), fetch → run (2 dialogs, 162 s) → rerun → export → check-results — no manual step; 10 chats
+    ≈ 7–9 min at 3 workers.
+
 ## Next
 1. User reviews flagged gold labels (grouped by rule in docs/LABELING.md) → status `reviewed`.
 2. Quota strategy (decision): billing, or another model with its own quota for tuning, keep 20/day for the control set.
