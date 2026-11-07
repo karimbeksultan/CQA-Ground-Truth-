@@ -128,7 +128,10 @@ def check_audio_url(url: str, hosts: list[str] | None = None, resolve: Callable 
 class Service:
     def __init__(self, store: Store | None = None, engine_factory: Callable = _engine_factory,
                  checklist_dir: Path = checklists.CHECKLIST_DIR, workers: int = 2,
-                 fetch: Callable[[str, bool], list[Conversation]] = data_source.load, resume_jobs: bool = True):
+                 fetch: Callable[[str, bool], list[Conversation]] = data_source.load, resume_jobs: bool = True,
+                 job_concurrency: int | None = None):
+        load_dotenv(ROOT / ".env")
+        self.job_concurrency = max(1, job_concurrency or int(os.environ.get("CQA_JOB_CONCURRENCY", "3") or 3))
         self.store = store or Store()
         self.engine_factory = engine_factory
         self.checklist_dir = checklist_dir
@@ -292,14 +295,21 @@ class Service:
             done = sum(existing[c]["status"] == "done" for c in job["conversation_ids"] if c in existing)
             failed = len(ids) - done
             self.store.update("jobs", job_id, done=done, failed=failed, evaluation_ids=ids)
-            for cid in job["conversation_ids"]:
-                if cid in existing:
-                    continue
+            todo = [c for c in job["conversation_ids"] if c not in existing]
+            progress = threading.Lock()
+
+            def one(cid: str) -> None:
+                nonlocal done, failed
                 rec = self.evaluate(cid, job["checklist_id"], job["engines"], job_id=job_id)
-                ids.append(rec["id"])
-                done += rec["status"] == "done"
-                failed += rec["status"] != "done"
-                self.store.update("jobs", job_id, done=done, failed=failed, evaluation_ids=ids)
+                with progress:
+                    ids.append(rec["id"])
+                    done += rec["status"] == "done"
+                    failed += rec["status"] != "done"
+                    self.store.update("jobs", job_id, done=done, failed=failed, evaluation_ids=list(ids))
+
+            # a few dialogs in parallel: ~100 s per dialog with Gemma, kept under the per-minute limit
+            with ThreadPoolExecutor(max_workers=self.job_concurrency, thread_name_prefix="cqa-eval") as pool:
+                list(pool.map(one, todo))
             self.store.update("jobs", job_id, status="finished", finished_at=now())
         except Exception as exc:  # the job itself broke (e.g. storage): mark it, never leave it "running"
             self.store.update("jobs", job_id, status="failed", error=f"{type(exc).__name__}: {str(exc)[:500]}",

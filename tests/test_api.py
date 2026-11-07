@@ -264,6 +264,33 @@ def test_job_survives_missing_conversation_and_resume_does_not_duplicate(env):
     assert svc.store.get("jobs", "j3")["done"] == 1
 
 
+def test_job_evaluates_dialogs_in_parallel(tmp_path):
+    import threading
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    recs = payload["data"]["records"]
+    payload["data"]["records"] = [{**recs[0], "conversation_id": f"t-{i}"} for i in range(6)]
+    live, peak, lock = [0], [0], threading.Lock()
+
+    class Slow(FakeEngine):
+        def evaluate(self, conv, checklist):
+            with lock:
+                live[0] += 1
+                peak[0] = max(peak[0], live[0])
+            time.sleep(0.2)
+            with lock:
+                live[0] -= 1
+            return super().evaluate(conv, checklist)
+
+    svc = Service(Store(tmp_path / "db.sqlite"), engine_factory=lambda s: Slow(), workers=1, job_concurrency=3,
+                  fetch=lambda g, r: data_source.parse(payload, g))
+    client = TestClient(create_app(svc))
+    client.post("/api/datasets/TEST/import")
+    r = client.post("/api/evaluations", json={"conversation_ids": [f"t-{i}" for i in range(6)]})
+    job = wait_job(client, r.json()["id"])
+    assert job["done"] == 6 and len(set(job["evaluation_ids"])) == 6
+    assert peak[0] == 3
+
+
 def test_fallback_chain_records_failures_and_engine():
     conv = data_source.parse(json.loads(FIXTURE.read_text(encoding="utf-8")))[0]
     cl = checklists.for_conversation(conv)
