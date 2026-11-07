@@ -276,12 +276,12 @@ def score_run(run_dir: Path, gold: dict[str, ground_truth.GoldLabel]) -> dict:
         pairs.append(Pair(conversation_id=cid, language=rec["language"], channel=rec["channel"],
                           checklist=checklist, pred=ev.answers(), gold=g.complete_answers(),
                           split=g.split or "", engine=ev.model or ""))
-    if not pairs and skipped["checklist_changed"]:
-        # never overwrite a run's report with an empty one: the rules it was scored by are gone from disk
-        raise ValueError(f"checklists changed since this run ({len(skipped['checklist_changed'])} dialogs): "
-                         "start a new run instead of re-scoring this one")
     metrics = compare(pairs) if pairs else {"n_conversations": 0}
     metrics["skipped"] = skipped
+    if not pairs and skipped["checklist_changed"] and (run_dir / "metrics.json").exists():
+        # never overwrite a run's report with an empty one: the rules it was scored by are gone from disk
+        metrics["not_written"] = "checklists changed since the run: the existing report is kept"
+        return metrics
     (run_dir / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")
     (run_dir / "report.md").write_text(report.render(meta, metrics), encoding="utf-8")
     return metrics

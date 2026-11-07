@@ -113,6 +113,8 @@ def cmd_compare(a: argparse.Namespace) -> None:
     run_dir = Path(a.run)
     group = a.group or json.loads((run_dir / "run.json").read_text(encoding="utf-8"))["group_id"]
     m = runner.score_run(run_dir, ground_truth.load(ground_truth.golden_path(group)))
+    if m.get("not_written"):
+        sys.exit(f"not re-scored: {m['not_written']} ({len(m['skipped']['checklist_changed'])} dialogs)")
     print(f"scored {m.get('n_conversations', 0)} conversations -> {run_dir / 'report.md'}")
 
 
