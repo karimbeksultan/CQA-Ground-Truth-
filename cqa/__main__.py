@@ -29,8 +29,17 @@ def _utf8_stdout() -> None:
 
 
 def cmd_fetch(a: argparse.Namespace) -> None:
-    convs = data_source.load(a.group, refresh=a.refresh)
-    print(f"{a.group}: {len(convs)} conversations -> {data_source.cache_path(a.group)}")
+    if a.file:
+        convs = data_source.import_file(a.group, Path(a.file))
+    else:
+        convs = data_source.load(a.group, refresh=a.refresh)
+    rejected: dict[str, str] = {}
+    data_source.load(a.group, rejected=rejected)
+    chans = Counter(c.channel for c in convs)
+    langs = Counter(c.language for c in convs)
+    print(f"{a.group}: {len(convs)} conversations ({dict(chans)}, {dict(langs)}) -> {data_source.cache_path(a.group)}")
+    for cid, reason in rejected.items():
+        print(f"  UNREADABLE {cid}: {reason}")
     print(" ", dict(Counter((c.channel, c.language) for c in convs)))
 
 
@@ -107,8 +116,9 @@ def cmd_export(a: argparse.Namespace) -> None:
     team = a.team or os.environ.get("CQA_TEAM_NAME", "").strip()
     if not team:
         sys.exit("team name: pass --team or set CQA_TEAM_NAME in .env")
-    convs = data_source.load(meta["group_id"])  # every dialog of the group, ids exactly as the API gives them
-    doc = export.build(run_dir, convs, team)
+    rejected: dict[str, str] = {}
+    convs = data_source.load(meta["group_id"], rejected=rejected)  # every dialog, ids exactly as the API gives them
+    doc = export.build(run_dir, convs, team, rejected)
     out = Path(a.out) if a.out else runner.ROOT / "results" / a.set / "results.json"
     export.write(doc, out)
     errors = [r for r in doc["results"] if r["status"] == "error"]
@@ -116,14 +126,19 @@ def cmd_export(a: argparse.Namespace) -> None:
           f"model {doc['model']['mode']}: {doc['model']['name']}")
     for r in errors:
         print(f"  ERROR {r['conversation_id']}: {r['error'][:200]}")
+    used = ", ".join(f"{cid}" for cid in meta.get("checklists", {}))
+    print(f"  checklists used by the run: {used}")
     if a.set == "prod" and len(doc["results"]) != 10:
-        print(f"  WARNING: prod must hold exactly 10 dialogs, this has {len(doc['results'])}")
+        sys.exit(f"ERROR: prod must hold exactly 10 dialogs, this file has {len(doc['results'])} — check the group id")
 
 
 def cmd_check_results(a: argparse.Namespace) -> None:
     from cqa.harness import export
     doc = json.loads(Path(a.file).read_text(encoding="utf-8"))
-    expected = [c.conversation_id for c in data_source.load(a.group)] if a.group else None
+    expected = None
+    if a.group:
+        rejected: dict[str, str] = {}
+        expected = [c.conversation_id for c in data_source.load(a.group, rejected=rejected)] + list(rejected)
     export.check(doc, expected_ids=expected)
     n_err = sum(r["status"] == "error" for r in doc["results"])
     print(f"OK: {len(doc['results'])} dialogs, {n_err} errors, schema {doc['schema_version']}")
@@ -142,6 +157,7 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="python -m cqa")
     sub = p.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("fetch"); f.add_argument("--group", default="DEV"); f.add_argument("--refresh", action="store_true")
+    f.add_argument("--file", help="read the group from a JSON file instead of the API (cached like an API response)")
     f.set_defaults(fn=cmd_fetch)
     t = sub.add_parser("gt-template"); t.add_argument("--group", default="DEV"); t.set_defaults(fn=cmd_gt_template)
     s = sub.add_parser("gt-status"); s.add_argument("--group", default="DEV"); s.set_defaults(fn=cmd_gt_status)

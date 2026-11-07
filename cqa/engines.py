@@ -19,7 +19,9 @@ from cqa.evaluators import register
 from cqa.models import Checklist, Conversation, Evaluation
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_ENGINES = "gemini:gemma-4-31b-it,gemini:gemini-3.5-flash"
+DEFAULT_ENGINES = ("gemini:gemma-4-31b-it,gemini:gemini-3.5-flash,gemini:gemini-3.8-flash,"
+                   "gemini:gemini-3-flash-preview,gemini:gemini-2.5-flash")
+# every free-tier model has its own daily quota: more fallbacks = a Gemma outage cannot stop the control hour
 
 
 @dataclass(frozen=True)

@@ -186,6 +186,39 @@ def test_rerun_retries_only_failed_with_same_settings(tmp_path, convs):
     assert preds[0]["evaluation"]["model"] == "m-9" and len(meta["reruns"]) == 1
 
 
+def test_predictions_survive_an_interrupted_run_and_rerun_completes_it(tmp_path, convs):
+    seen_on_disk: list[int] = []
+    out_dir = tmp_path / "runs" / "r7"
+
+    @evaluators.register("watcher")
+    class Watcher:
+        name = "watcher"
+        model = None
+
+        def evaluate(self, conv, checklist):
+            # with one worker the first dialog must already be on disk when the second one starts
+            seen_on_disk.append(len(runner.load_predictions(out_dir)))
+            return evaluators.create("optimistic").evaluate(conv, checklist).model_copy(update={"evaluator": "watcher"})
+
+    out = runner.run("TEST", "watcher", convs=convs, gold_path=tmp_path / "none.jsonl", runs_dir=tmp_path / "runs",
+                     run_id="r7", workers=1)
+    assert seen_on_disk == [0, 1]
+    meta = json.loads((out / "run.json").read_text(encoding="utf-8"))
+    assert meta["status"] == "finished" and meta["selected"] == ["t-ru-001", "t-ru-call-001"]
+
+    # simulate a crash after the first dialog: only one line written, run.json still "running"
+    first = (out / "predictions.jsonl").read_text(encoding="utf-8").split("\n")[0]
+    (out / "predictions.jsonl").write_text(first + "\n", encoding="utf-8")
+    meta.update(status="running")
+    (out / "run.json").write_text(json.dumps(meta), encoding="utf-8")
+    res = runner.rerun_failed(out, workers=1, convs=convs, gold_path=tmp_path / "none.jsonl")
+    assert res == {"retried": 1, "fixed": 1}
+    preds = runner.load_predictions(out)
+    assert [p["conversation_id"] for p in preds] == ["t-ru-001", "t-ru-call-001"]
+    meta = json.loads((out / "run.json").read_text(encoding="utf-8"))
+    assert meta["status"] == "finished" and meta["n_ok"] == 2
+
+
 def test_split_requires_gold(convs, tmp_path):
     with pytest.raises(ValueError):
         runner.run("TEST", "optimistic", convs=convs, split="dev", gold_path=tmp_path / "none.jsonl",

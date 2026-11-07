@@ -117,3 +117,30 @@ def test_check_requires_exactly_the_group_ids(tmp_path, convs):
     doc = export.build(_run_dir(tmp_path, [_pred(convs[0], ANSWERS)]), [convs[0]], "Team")
     with pytest.raises(export.ExportError, match="missing"):
         export.check(doc, expected_ids=[c.conversation_id for c in convs])
+
+
+def test_unreadable_record_becomes_an_error_entry_not_a_lost_group(tmp_path, convs):
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload["data"]["records"].append({"conversation_id": "bad-001", "channel": "agent chat", "language": "RU",
+                                       "transcript": [{"speaker": "client", "text": "нет метки времени"}]})
+    payload["data"]["records"][0]["language"] = "ru"  # case differences are normalized, not rejected
+    with pytest.raises(KeyError):
+        data_source.parse(payload)                    # strict by default (uploads report the problem)
+    rejected: dict = {}
+    good = data_source.parse(payload, rejected=rejected)
+    assert [c.conversation_id for c in good] == ["t-ru-001", "t-ru-call-001"] and good[0].language == "RU"
+    assert list(rejected) == ["bad-001"] and "timestamp" in rejected["bad-001"]
+    doc = export.build(_run_dir(tmp_path, [_pred(good[0], ANSWERS)]), good, "Team", rejected)
+    by = {r["conversation_id"]: r for r in doc["results"]}
+    assert by["bad-001"]["status"] == "error" and "timestamp" in by["bad-001"]["error"]
+    assert by["t-ru-001"]["status"] == "ok" and by["t-ru-call-001"]["status"] == "error"
+
+
+def test_group_from_a_file_is_cached_like_an_api_response(tmp_path, monkeypatch):
+    monkeypatch.setattr(data_source, "RAW_DIR", tmp_path / "raw")
+    records = json.loads(FIXTURE.read_text(encoding="utf-8"))["data"]["records"]
+    f = tmp_path / "prod.json"
+    f.write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
+    convs = data_source.import_file("PROD1", f)
+    assert [c.conversation_id for c in convs] == ["t-ru-001", "t-ru-call-001"]
+    assert [c.conversation_id for c in data_source.load("PROD1")] == ["t-ru-001", "t-ru-call-001"]

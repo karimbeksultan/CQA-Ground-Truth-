@@ -83,11 +83,17 @@ def run(group_id: str, evaluator_name: str, *, checklist_override: str | None = 
         run_id: str | None = None, convs: list[Conversation] | None = None,
         gold_path: Path | None = None, runs_dir: Path = RUNS_DIR, evaluator_kwargs: dict | None = None) -> Path:
     evaluator = evaluators.create(evaluator_name, **(evaluator_kwargs or {}))
-    convs = convs if convs is not None else data_source.load(group_id)
+    rejected: dict[str, str] = {}
+    convs = convs if convs is not None else data_source.load(group_id, rejected=rejected)
+    if ids:
+        rejected = {k: v for k, v in rejected.items() if k in set(ids)}
+        ids = [i for i in ids if i not in rejected]
     gold_path = gold_path or ground_truth.golden_path(group_id)
     gold = ground_truth.load(gold_path) if gold_path.exists() else None
-    selected = select(convs, ids, split, gold)
-    if not selected:
+    selected = select(convs, ids, split, gold) if (ids is None or ids) else []
+    if split:
+        rejected = {}  # a record we cannot read has no split
+    if not selected and not rejected:
         raise ValueError("no conversations selected")
     # resolved before any output exists: a bad --checklist fails fast instead of leaving a half run
     plan = [(c, checklists.for_conversation(c, checklist_override)) for c in selected]
@@ -98,26 +104,44 @@ def run(group_id: str, evaluator_name: str, *, checklist_override: str | None = 
     started = datetime.now(timezone.utc)
     t0 = time.perf_counter()
 
-    abort = threading.Event()
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        records = list(pool.map(lambda job: _evaluate_one(evaluator, *job, abort=abort), plan))
-
-    with (out / "predictions.jsonl").open("w", encoding="utf-8") as f:
-        for rec in records:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
     meta = {
         "run_id": run_id, "group_id": group_id, "evaluator": evaluator_name,
         "model": getattr(evaluator, "model", None), "evaluator_kwargs": evaluator_kwargs or {},
         "split": split, "git_commit": _git_commit(),
         "checklists": {cl.id: checklists.fingerprint(cl) for _, cl in plan},
-        "started_at": started.isoformat(), "duration_s": round(time.perf_counter() - t0, 2),
+        "selected": [c.conversation_id for c in selected] + list(rejected),
+        "started_at": started.isoformat(), "status": "running",
+    }
+    # run.json first and every prediction appended as soon as it finishes: if the process dies
+    # (crash, Ctrl+C, sleeping laptop), finished dialogs survive and `rerun` completes the rest
+    (out / "run.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    pred_path = out / "predictions.jsonl"
+    pred_path.touch()
+    write_lock = threading.Lock()
+    abort = threading.Event()
+
+    def work(job: tuple[Conversation, Checklist]) -> dict:
+        rec = _evaluate_one(evaluator, *job, abort=abort)
+        with write_lock, pred_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        return rec
+
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        records = list(pool.map(work, plan))
+    records += [{"conversation_id": cid, "language": None, "channel": None, "checklist_id": None,
+                 "checklist_fingerprint": None, "evaluation": None, "score": None, "error": reason,
+                 "latency_s": 0.0} for cid, reason in rejected.items()]
+
+    _write_predictions(out, records)  # final file in selection order
+    meta.update({
+        "status": "finished", "duration_s": round(time.perf_counter() - t0, 2),
         "n_selected": len(selected), "n_ok": sum(r["error"] is None for r in records),
         "errors": {r["conversation_id"]: r["error"] for r in records if r["error"]},
         "aborted": abort.is_set(),
         "latency_s": {"mean": round(sum(r["latency_s"] for r in records) / len(records), 3),
                       "max": max(r["latency_s"] for r in records)},
-    }
+        "unreadable_records": rejected,
+    })
     (out / "run.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if gold:
@@ -130,40 +154,59 @@ def rerun_failed(run_dir: Path, *, workers: int = 4, convs: list[Conversation] |
     """Re-evaluate only the conversations that failed in a run, with the same evaluator, model and
     checklists, and write them back into the same run. Refuses if a checklist changed since the run."""
     meta = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
-    records = load_predictions(run_dir)
-    failed = [r for r in records if r["error"]]
-    if not failed:
+    by_id = {c.conversation_id: c for c in (convs if convs is not None else data_source.load(meta["group_id"]))}
+    latest: dict[str, dict] = {}
+    for r in load_predictions(run_dir):  # an interrupted run may list a dialog twice: keep the last
+        latest[r["conversation_id"]] = r
+    selected = meta.get("selected") or list(latest)
+    records = [latest[cid] for cid in selected if cid in latest]
+    failed = [r for r in records if r["error"] and r["conversation_id"] in by_id]  # unreadable records stay errors
+    never_ran = [cid for cid in selected if cid not in latest and cid in by_id]  # an interrupted run never reached them
+    if not failed and not never_ran:
         return {"retried": 0, "fixed": 0}
     kwargs = meta.get("evaluator_kwargs") or ({"model": meta["model"]} if meta.get("model") else {})
     evaluator = evaluators.create(meta["evaluator"], **kwargs)
-    by_id = {c.conversation_id: c for c in (convs if convs is not None else data_source.load(meta["group_id"]))}
     plan = []
     for r in failed:
         cl = checklists.load(r["checklist_id"])
         if checklists.fingerprint(cl) != r["checklist_fingerprint"]:
             raise ValueError(f"checklist {cl.id} changed since the run; start a new run instead")
         plan.append((by_id[r["conversation_id"]], cl))
+    for cid in never_ran:
+        cl = checklists.for_conversation(by_id[cid])
+        if checklists.fingerprint(cl) not in (meta.get("checklists") or {}).values():
+            raise ValueError(f"checklist {cl.id} changed since the run; start a new run instead")
+        plan.append((by_id[cid], cl))
 
     abort = threading.Event()
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
         redone = {rec["conversation_id"]: rec
                   for rec in pool.map(lambda job: _evaluate_one(evaluator, *job, abort=abort), plan)}
-    records = [redone.get(r["conversation_id"], r) for r in records]
-    with (run_dir / "predictions.jsonl").open("w", encoding="utf-8") as f:
-        for rec in records:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    merged = {**{r["conversation_id"]: r for r in records}, **redone}
+    records = [merged[cid] for cid in selected if cid in merged]
+    _write_predictions(run_dir, records)
 
     fixed = sum(1 for r in redone.values() if r["error"] is None)
+    meta["status"] = "finished"
+    meta["n_selected"] = len(selected)
     meta["errors"] = {r["conversation_id"]: r["error"] for r in records if r["error"]}
     meta["n_ok"] = sum(r["error"] is None for r in records)
     meta["aborted"] = abort.is_set()
     meta.setdefault("reruns", []).append({"at": datetime.now(timezone.utc).isoformat(),
-                                          "retried": len(failed), "fixed": fixed, "git_commit": _git_commit()})
+                                          "retried": len(plan), "fixed": fixed, "git_commit": _git_commit()})
     (run_dir / "run.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     gold_path = gold_path or ground_truth.golden_path(meta["group_id"])
     if gold_path.exists():
         score_run(run_dir, ground_truth.load(gold_path))
-    return {"retried": len(failed), "fixed": fixed}
+    return {"retried": len(plan), "fixed": fixed}
+
+
+def _write_predictions(run_dir: Path, records: list[dict]) -> None:
+    tmp = run_dir / "predictions.jsonl.tmp"
+    with tmp.open("w", encoding="utf-8") as f:
+        for rec in records:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    tmp.replace(run_dir / "predictions.jsonl")
 
 
 def load_predictions(run_dir: Path) -> list[dict]:

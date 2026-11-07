@@ -113,20 +113,26 @@ def _models(preds: list[dict], evaluator: str) -> tuple[str, str]:
     return mode, ", ".join(names) or evaluator
 
 
-def build(run_dir: Path, convs: list[Conversation], team_name: str) -> dict:
-    """Results document for every dialog in `convs` (the full group as the API returns it)."""
+def build(run_dir: Path, convs: list[Conversation], team_name: str,
+          rejected: dict[str, str] | None = None) -> dict:
+    """Results document for every dialog of the group: `convs` as the API returns them, plus
+    `rejected` records that could not be read (listed as errors with the reason)."""
     meta = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
-    preds = {r["conversation_id"]: r for r in load_predictions(run_dir)}
-    unknown = sorted(set(preds) - {c.conversation_id for c in convs})
+    preds: dict[str, dict] = {}
+    for r in load_predictions(run_dir):  # an interrupted run may list a dialog twice: keep the last
+        preds[r["conversation_id"]] = r
+    rejected = rejected or {}
+    unknown = sorted(set(preds) - {c.conversation_id for c in convs} - set(rejected))
     if unknown:
         raise ExportError(f"run has dialogs that are not in the group: {unknown}")
     results = [record(preds[c.conversation_id], c) if c.conversation_id in preds
                else _error_record(c.conversation_id, "диалог не был оценён в этом запуске")
                for c in convs]
+    results += [_error_record(cid, reason) for cid, reason in rejected.items()]
     mode, name = _models(list(preds.values()), meta["evaluator"])
     doc = {"schema_version": SCHEMA_VERSION, "team_name": team_name,
            "model": {"mode": mode, "name": name}, "results": results}
-    check(doc, expected_ids=[c.conversation_id for c in convs])
+    check(doc, expected_ids=[c.conversation_id for c in convs] + list(rejected))
     return doc
 
 
