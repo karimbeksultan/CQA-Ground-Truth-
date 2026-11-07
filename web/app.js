@@ -106,6 +106,12 @@ const state = {
   evalCache: new Map(),
 };
 setLang(store.get("lang", "ru"));
+// demo links: ?role=reviewer|analyst and ?lang=ru|en|kk open the app in that role/language and remember it
+{
+  const q = new URLSearchParams(location.search);
+  if (["analyst", "reviewer"].includes(q.get("role"))) { state.role = q.get("role"); store.set("role", state.role); }
+  if (LANGS.includes(q.get("lang"))) { setLang(q.get("lang")); store.set("lang", q.get("lang")); }
+}
 
 // ---------- shell ----------
 function renderRail() {
