@@ -41,6 +41,11 @@
   ±5 in 76%, gross-error recall 100%, c07 96%. Calls still weakest (78.6%, 2 dialogs).
   One dialog failed (gemma 503 "high demand" ×6); `cqa rerun --run <dir>` re-evaluated it with the same
   model/checklist → full dev run 26/26: **95.0% agreement, MAE 2.12**, ±10 in 96%.
+- **Sealed test split (milestone, reported once)**, gemma-4-31b-it + checklists v2, 26/26:
+  92.9% criterion agreement, total MAE 4.04, ±5 in 73%, ±10 in 88.5%, gross errors 1/1.
+  Chats 95.2% / MAE 2.34 (24 dialogs); **calls 64.3% / MAE 24.5 (2 dialogs)** — p4-ru-001 off by 40.8
+  (model: c04 20, c05 yes, c06 10 vs gold 15/no/7). By language: EN 97.6%, RU 91.8%, KZ 90.5%.
+  Remaining weak spots: c06 middle steps (7 never hit), c05 "no" recall 50%, calls overall.
 - Local engine proven: `ollama` + qwen3:1.7b on CPU evaluated p1-ru-001 end to end (valid JSON first
   call, 2.5k in / 1.2k out tokens) but took 605 s and graded leniently (total 100 vs gold 92.31) —
   fine to demo "works offline", not usable as the primary engine on this laptop.
