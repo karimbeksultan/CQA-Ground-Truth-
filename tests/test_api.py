@@ -388,3 +388,18 @@ def test_results_file_seeds_a_fresh_deployment_once(env, tmp_path):
     seeded = fresh.store.list("evaluations")[0]
     assert seeded["source"] == "results.json" and seeded["score"]["total"] == doc["results"][0]["score"]["final_score"]
     assert fresh.import_results(f)["stored"] == 0  # idempotent on every boot
+
+
+def test_results_skip_a_demo_evaluation_that_does_not_fit_the_format(env):
+    client, svc, _, _ = env
+    client.post("/api/datasets/TEST/import")
+    evaluate(client, ["t-ru-001"])
+    base = client.get("/api/checklists/chat_default_v1").json()
+    swapped = {**base, "id": "chat_live_swap", "name": "swap",
+               "criteria": [c for c in base["criteria"] if c["id"] != "c05"]
+               + [{**next(c for c in base["criteria"] if c["id"] == "c05"), "id": "c09", "name": "Новый критерий"}]}
+    assert client.post("/api/checklists", json=swapped).status_code == 201
+    evaluate(client, ["t-ru-001"], "chat_live_swap")  # newest evaluation now has c09, which has no code
+    rec = next(r for r in client.get("/api/results", params={"group_id": "TEST", "team": "T"}).json()["results"]
+               if r["conversation_id"] == "t-ru-001")
+    assert rec["status"] == "ok" and {c["criterion_id"] for c in rec["criteria"]} >= {"empathy"}

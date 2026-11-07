@@ -343,14 +343,21 @@ class Service:
         if not docs:
             raise NotFound(f"no dialogs imported for group {group_id!r}")
         convs = [self.conversation(d["conversation_id"]) for d in docs]
-        latest = self._latest_evaluations()
+        by_conv: dict[str, list[dict]] = {}
+        for ev in self.store.list("evaluations"):  # ordered by created_at
+            by_conv.setdefault(ev["conversation_id"], []).append(ev)
         preds = {}
         for c in convs:
-            ev = latest.get(c.conversation_id)
-            if ev is None:
+            evs = by_conv.get(c.conversation_id) or []
+            if not evs:
                 continue
-            preds[c.conversation_id] = {"evaluation": ev.get("evaluation"), "score": ev.get("score"),
-                                        "error": None if ev["status"] == "done" else (ev.get("error") or "оценка не удалась")}
+            as_pred = lambda ev: {"evaluation": ev.get("evaluation"), "score": ev.get("score"),
+                                  "error": None if ev["status"] == "done" else (ev.get("error") or "оценка не удалась")}
+            # the newest evaluation that fits the organizers' 8 criterion codes: a live demo swap that adds
+            # a new criterion (c09) or changes a type must not turn the submitted file into errors
+            fitting = next((ev for ev in reversed(evs) if ev["status"] == "done"
+                            and export.record(as_pred(ev), c)["status"] == "ok"), None)
+            preds[c.conversation_id] = as_pred(fitting or evs[-1])
         return export.build_from_predictions(preds, convs, team_name, "chain")
 
     def _latest_evaluations(self) -> dict[str, dict]:
