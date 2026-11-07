@@ -157,6 +157,9 @@ class Service:
             raise NotFound(f"checklists/{checklist_id}") from None
 
     def save_checklist(self, checklist: Checklist, *, create: bool) -> Checklist:
+        if not create and checklists.is_protected(checklist.id):
+            # the defaults are what auto-routing and the control-set run use: a live edit goes to a new id
+            raise ConflictError(f"базовый чек-лист {checklist.id!r} не меняется на месте — сохраните изменения как новый чек-лист")
         with self._lock:
             exists = (self.checklist_dir / f"{checklist.id}.json").exists()
             if create and exists:

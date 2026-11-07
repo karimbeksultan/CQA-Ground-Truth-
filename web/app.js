@@ -23,6 +23,7 @@ const ICONS = {
   upload: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>',
   download: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></svg>',
   run: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16l13-8z"/></svg>',
+  logo: '<svg viewBox="0 0 32 32" fill="none"><path d="M5 27C5 14.5 13.5 5.5 27.5 4.5 27 18.5 18.5 27 5 27Z" fill="#06ae3c"/><path d="M10.5 17.5l3.6 3.7 7.4-9" stroke="#04140a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   back: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
 };
 
@@ -114,8 +115,8 @@ function renderRail() {
   const seg = (items, value, onPick, labelId) => h("div", { class: "seg", role: "group", "aria-labelledby": labelId },
     items.map(([v, label]) => h("button", { type: "button", "aria-pressed": String(v === value), onclick: () => onPick(v) }, label)));
   $rail.replaceChildren(
-    h("div", { class: "brand" }, h("div", { class: "brand-mark", "aria-hidden": "true" }, "F"),
-      h("div", { class: "brand-name" }, "CQA · Freedom", h("small", {}, t("brand.sub")))),
+    h("div", { class: "brand" }, h("span", { class: "brand-mark", icon: "logo", "aria-hidden": "true" }),
+      h("div", { class: "brand-name" }, "CQA", h("small", {}, t("brand.sub")))),
     h("nav", { class: "nav", "aria-label": "CQA" },
       link("", "#/", "dialogs"),
       link("appeals", "#/appeals", "appeals", state.openAppeals ? h("span", { class: "count" }, state.openAppeals) : null),
@@ -288,7 +289,7 @@ function dialogsTable() {
           : h("span", { class: "tag", icon: "chat" }, t("dialogs.chat"))),
         h("td", {}, h("span", { class: "tag lang" }, c.language)),
         h("td", { class: "num muted" }, c.turns),
-        h("td", {}, running ? h("span", { class: "state" }, "…")
+        h("td", {}, running ? h("span", { class: "state running" }, t("status.running"))
           : !ev ? h("span", { class: "state" }, t("status.none"))
           : ev.status === "failed" ? h("span", { class: "state failed" }, t("status.failed"))
           : h("span", { class: "state" }, t("status.done"),
@@ -309,7 +310,10 @@ function setSummary() {
   const totals = done.map((c) => c.latest_evaluation.total).filter((v) => v != null);
   const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : null;
   const gross = done.filter((c) => c.latest_evaluation.gross_error).length;
-  const ref = state.checklists.find((c) => c.id === "chat_default_v1") || state.checklists[0];
+  const used = {};
+  for (const r of done) used[r.latest_evaluation.checklist_id] = (used[r.latest_evaluation.checklist_id] || 0) + 1;
+  const mostUsed = Object.entries(used).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const ref = state.checklists.find((c) => c.id === mostUsed) || state.checklists.find((c) => c.id === "chat_default_v1") || state.checklists[0];
   const crits = (ref?.criteria || []).filter((c) => c.type !== "flag" && c.weight > 0);
   const segs = crits.map((c) => {
     const vals = done.map((r) => r.latest_evaluation.criteria?.[c.id]).filter((v) => v !== undefined);
@@ -383,10 +387,13 @@ function dialogsView() {
   const evalBtn = h("button", { class: "btn primary", type: "button", icon: "run",
     onclick: async (e) => {
       e.currentTarget.disabled = true;
-      try { await startJob(selectedIds(), state.checklistChoice); state.selected.clear(); refreshTable(); }
+      try { await startJob(selectedIds(), state.checklistChoice, batchEngine?.value || ""); state.selected.clear(); refreshTable(); }
       catch (err) { toast(`${t("err.prefix")}: ${err.message}`, "error"); }
       updateEvalButton();
     } }, evalLabel);
+  const batchEngine = state.engineOptions.length > 1 ? h("select", { class: "input", "aria-label": t("engine.pick") },
+    state.engineOptions.map(([v, l]) => h("option", { value: v, selected: v === (state.engineChoice || "") }, l))) : null;
+  if (batchEngine) batchEngine.addEventListener("change", () => { state.engineChoice = batchEngine.value; });
   const jobsHost = h("div", { class: "jobs-host" }, jobStrip());
   const tableHost = h("div", { class: "table-host" }, dialogsTable());
   const summaryHost = h("div", { class: "summary-host" }, setSummary());
@@ -424,6 +431,7 @@ function dialogsView() {
       field(t("dialogs.checklist"), h("select", { class: "input", onchange: (e) => { state.checklistChoice = e.target.value; } },
         h("option", { value: "" }, t("dialogs.autoHint")),
         state.checklists.map((c) => h("option", { value: c.id, selected: c.id === state.checklistChoice }, `${c.name}, v${c.version}`)))),
+      batchEngine ? field(t("engine.pick"), batchEngine) : null,
       evalBtn, h("div", { class: "spacer" }), resultsLink),
     jobsHost,
     summaryHost,
@@ -643,6 +651,8 @@ async function cardView(convId, evalId) {
           prev ? h("div", { class: "row" }, h("span", { class: "muted" }, t("card.prev")),
             `${fmt(prev.score.total)} → ${fmt(orig)}`, h("span", { class: "muted" }, `${prev.checklist.name} · v${prev.checklist_version}`)) : null,
           h("div", { class: "row" }, h("span", { class: "muted" }, t("card.checklist")), `${checklist.name} · v${ev.checklist_version}`),
+          ev.source ? h("div", { class: "row" }, h("span", { class: "source-pill" },
+            ev.source === "results.json" ? t("card.sourceResults") : t("card.sourceRun", { id: ev.source.replace(/^run:/, "") }))) : null,
           h("div", { class: "row" }, h("span", { class: "muted" }, t("card.engine")), ev.model || ev.engine || "—",
             usage.fallback_from ? h("span", { class: "status-pill open" }, t("card.fallback")) : null),
           h("div", { class: "row" }, h("span", { class: "muted" }, t("card.cost")), ev.cost_usd ? `$${ev.cost_usd}` : t("card.free"),
@@ -786,7 +796,7 @@ function checklistsView(id) {
     try {
       let saved;
       if (asNew) {
-        body.id = newIdInput.value.trim();
+        body.id = newIdInput.value.trim() || autoId();
         saved = await api("/api/checklists", { method: "POST", body: JSON.stringify(body) });
       } else {
         saved = await api(`/api/checklists/${encodeURIComponent(body.id)}`, { method: "PUT", body: JSON.stringify(body) });
@@ -799,6 +809,13 @@ function checklistsView(id) {
     } catch (err) { errorBox.textContent = err.message; errorBox.hidden = false; errorBox.scrollIntoView({ block: "center" }); return null; }
   };
   const newIdInput = h("input", { class: "input", placeholder: "chat_control_v1", "aria-label": t("cl.newId"), style: "width:220px" });
+  const isDefault = Boolean(draft && /_default_v1$/.test(draft.id));
+  const autoId = () => {
+    const base = draft.id.replace(/_default_v1$/, "").replace(/_v\d+$/, "");
+    let n = 1;
+    while (state.checklists.some((c) => c.id === `${base}_custom_${n}`)) n++;
+    return `${base}_custom_${n}`;
+  };
 
   const critEditor = (c, i) => {
     const bind = (key, transform = (v) => v) => (e) => { c[key] = transform(e.target.type === "checkbox" ? e.target.checked : e.target.value); mark(); };
@@ -882,14 +899,15 @@ function checklistsView(id) {
         h("div", { class: "sticky-actions" },
           h("button", { class: "btn", type: "button", onclick: async () => {
             let id = draft.id;
-            if (draftDirty) { const saved = await save(false, true); if (!saved) return; id = saved.id; }
+            if (draftDirty) { const saved = await save(isDefault, true); if (!saved) return; id = saved.id; }
             state.checklistChoice = id;
             toast(t("cl.applied"), "ok");
             navigate("#/");
           } }, t("cl.apply")),
           newIdInput,
-          h("button", { class: "btn", type: "button", onclick: () => save(true) }, t("cl.saveAs")),
-          h("button", { class: "btn primary", type: "button", onclick: () => save(false) }, t("cl.save")))) : null),
+          isDefault ? h("span", { class: "protected-note" }, t("cl.protected")) : null,
+          isDefault ? null : h("button", { class: "btn", type: "button", onclick: () => save(true) }, t("cl.saveAs")),
+          h("button", { class: "btn primary", type: "button", onclick: () => save(isDefault) }, isDefault ? t("cl.saveAs") : t("cl.save")))) : null),
   ];
 }
 

@@ -6,7 +6,7 @@ const S = {
   "nav.dialogs": ["Диалоги", "Dialogs", "Диалогтар"],
   "nav.appeals": ["Апелляции", "Appeals", "Апелляциялар"],
   "nav.checklists": ["Чек-листы", "Checklists", "Чек-парақтар"],
-  "brand.sub": ["Контроль качества", "Quality analytics", "Сапаны бақылау"],
+  "brand.sub": ["контроль качества диалогов", "conversation quality", "диалог сапасын бақылау"],
   "role.label": ["Роль", "Role", "Рөл"],
   "role.analyst": ["Аналитик", "Analyst", "Талдаушы"],
   "role.reviewer": ["Проверяющий", "Reviewer", "Тексеруші"],
@@ -198,6 +198,11 @@ const S = {
   "cl.sections": ["Секции", "Sections", "Бөлімдер"],
   "cl.addSection": ["Добавить секцию", "Add section", "Бөлім қосу"],
   "cl.sectionName": ["Название секции", "Section name", "Бөлім атауы"],
+
+  "status.running": ["оценивается…", "evaluating…", "бағалануда…"],
+  "card.sourceResults": ["загружено из results/dev/results.json", "loaded from results/dev/results.json", "results/dev/results.json ішінен жүктелді"],
+  "card.sourceRun": ["загружено из прогона {id}", "loaded from run {id}", "{id} іске қосылымынан жүктелді"],
+  "cl.protected": ["Базовый чек-лист не меняется на месте: изменения сохранятся как новый чек-лист (имя можно задать слева).", "The default checklist is never changed in place: edits are saved as a new checklist (name it on the left).", "Негізгі чек-парақ орнында өзгермейді: өзгерістер жаңа чек-парақ ретінде сақталады (атауын сол жақта беруге болады)."],
 
   "err.network": ["Сервер не отвечает. Проверьте, что запущен uvicorn.", "The server is not responding. Check that uvicorn is running.", "Сервер жауап бермейді. uvicorn іске қосылғанын тексеріңіз."],
   "err.prefix": ["Ошибка", "Error", "Қате"],

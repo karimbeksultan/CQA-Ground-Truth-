@@ -124,7 +124,8 @@ def test_appeal_decision_recomputes_against_the_snapshot(env):
     # edit the live checklist after the evaluation: c07 weight 5 -> 50 must NOT affect this evaluation
     live = json.loads((cl_dir / "chat_default_v1.json").read_text(encoding="utf-8"))
     live["criteria"][6]["weight"] = 50
-    client.put("/api/checklists/chat_default_v1", json=live)
+    assert client.put("/api/checklists/chat_default_v1", json=live).status_code == 409  # defaults are read-only
+    (cl_dir / "chat_default_v1.json").write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
 
     ap = client.post(f"/api/evaluations/{ev['id']}/appeals", json={"criterion_id": "c07", "comment": "Не предложил помощь"})
     assert ap.status_code == 201 and ap.json()["disputed"]["answer"] == "yes"

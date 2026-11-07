@@ -48,3 +48,9 @@ def for_conversation(conv: Conversation, override: str | None = None,
                      directory: Path = CHECKLIST_DIR) -> Checklist:
     """Explicit checklist id, or the channel default (chat vs call)."""
     return load(override or DEFAULT_BY_CHANNEL[conv.channel], directory)
+
+
+def is_protected(checklist_id: str) -> bool:
+    """Default checklists (tracked in git, used by auto-routing and the control-set run) are read-only via the
+    API; edits are saved under a new id so a live demo change can never alter the submitted results."""
+    return checklist_id.endswith("_default_v1")
