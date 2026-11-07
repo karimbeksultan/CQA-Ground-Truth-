@@ -6,7 +6,7 @@ each verdict, appeal a criterion and record the reviewer's decision.
 
 > Status: data adapter, checklist engine, deterministic scoring, evaluation harness, LLM evaluators,
 > HTTP API (jobs, appeals, audio) and the web UI (RU/EN/KZ) are in place (see `progress.md`,
-> `docs/REQUIREMENTS.md`). Full DEV run with the shipped config: 94.1% criterion agreement with our own gold labels (chats 95.2%), total MAE 3.17 — agreement with the team's labels, not with the organizers' ground truth.
+> `docs/REQUIREMENTS.md`). Full DEV run with the shipped config (chat v5 / call v6): **95.0% criterion agreement on the held-out test split** (total MAE 2.89); all 65 dialogs 94.3% (95% interval 91.9–96.5%, majority-class baseline 79.1%); gross errors 8/8 with no false alarms. These numbers are agreement with the team's own labels; an independent blind relabeling of 20 chats agrees with those labels on 91.9%.
 
 ## Demo path (5 minutes, matches the guide)
 

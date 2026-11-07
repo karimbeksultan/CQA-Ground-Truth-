@@ -114,6 +114,13 @@
   Full DEV run (chat v4 / call v5): **94.7% / MAE 3.08, chats 95.7% / 2.20, gross errors 8/8, 0 false alarms**,
   no empty evidence. Blind independent labeling of 20 chats agrees with our gold on 91.9% (c02 is the gap).
 
+- **Fourth pass (2026-11-08, morning):** 12-role panel (CTO 7.5, ML 6, PM 7, BA 7.5, DA 6, DE 7, CEO 7, judge
+  6.5, compliance 8, data-to-claim 7, LLM eval 7, security 7). Fixed: c06 again lowers when rudeness derails the
+  dialog; quotes must be found in the dialog (1 of 65 dialogs still flagged on the old run); unknown roles without
+  an operator are rejected; overrides never cross channels; uploads/job caps; injection check (no verdict flipped).
+  Final DEV run (chat v5 / call v6): **test 95.0% / MAE 2.89**, all 94.3% (91.9–96.5%), c06=4 recall 85.7%,
+  gross errors 8/8, 63/65 answered by Gemma, no ungrounded quotes, no empty evidence.
+
 ## Next
 1. Control hour (T+23): fetch the new group → `run --evaluator chain --engines cloud` → `rerun` → `export --set prod`
    → `check-results --group` → commit and push `results/prod/results.json` → only then the live criterion swap
