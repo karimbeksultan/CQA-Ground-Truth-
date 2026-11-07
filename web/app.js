@@ -456,7 +456,7 @@ function transcriptPane(conv) {
     return h("div", { class: `turn ${tu.speaker} ${holds[i] ? "hold" : ""}`, id: `turn-${tu.index}`, "data-hold": holds[i] ? t("turn.hold") : false },
       h("div", { class: "idx" }, tu.index + 1),
       h("div", {},
-        h("div", { class: "who" }, t(`speaker.${tu.speaker}`), time ? h("time", {}, time) : null,
+        h("div", { class: "who" }, t(`speaker.${tu.speaker}`), time ? h("time", { datetime: tu.timestamp, title: tu.timestamp }, time) : null,
           audio && tu.audio_offset != null ? h("button", { class: "seek", type: "button", title: t("turn.play"), "aria-label": t("turn.play"), icon: "play",
             onclick: () => { audio.currentTime = tu.audio_offset; audio.play().catch(() => {}); } }) : null),
         h("div", { class: "txt" }, tu.text)));
@@ -859,7 +859,18 @@ function checklistsView(id) {
             h("select", { class: "input", onchange: (e) => { draft.channel = e.target.value; mark(); } },
               ["chat", "call", "any"].map((ch) => h("option", { value: ch, selected: draft.channel === ch }, t(`cl.channel.${ch}`))))),
           h("div", { class: "field span-3" }, h("span", {}, t("cl.id")), h("div", { style: "padding-top:7px" }, `${draft.id} · ${t("cl.version", { v: draft.version })}`))),
-        h("div", { style: "display:flex;align-items:center;gap:12px;margin-bottom:10px" }, h("h2", { style: "margin:0;font-size:1.05rem" }, t("cl.criteria")), weightNote, dirtyNote),
+        h("div", { class: "sections-edit" },
+          h("h2", { style: "margin:0 0 8px;font-size:1.05rem" }, t("cl.sections")),
+          h("div", { class: "form-grid" }, draft.sections.map((sec) => h("label", { class: "field span-4" }, h("span", {}, sec.id),
+            h("input", { class: "input", value: sec.name, "aria-label": t("cl.sectionName"), oninput: (e) => { sec.name = e.target.value; mark(); } })))),
+          h("button", { class: "btn sm", type: "button", style: "margin-top:8px", onclick: () => {
+            const used = new Set(draft.sections.map((x) => x.id));
+            let n = draft.sections.length + 1;
+            while (used.has(`s${n}`)) n++;
+            draft.sections.push({ id: `s${n}`, name: t("cl.sectionName") });
+            mark(); route();
+          } }, t("cl.addSection"))),
+        h("div", { style: "display:flex;align-items:center;gap:12px;margin:18px 0 10px" }, h("h2", { style: "margin:0;font-size:1.05rem" }, t("cl.criteria")), weightNote, dirtyNote),
         draft.criteria.map(critEditor),
         h("button", { class: "btn", type: "button", style: "margin-top:12px", onclick: () => {
           const used = new Set(draft.criteria.map((c) => c.id));

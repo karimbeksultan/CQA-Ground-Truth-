@@ -195,6 +195,10 @@ const S = {
   "sum.filterOn": ["Показаны диалоги, где оператор терял баллы по {id} «{name}».", "Showing dialogs that lost points on {id} “{name}”.", "{id} «{name}» бойынша ұпай жоғалтқан диалогтар көрсетілген."],
   "sum.clear": ["Показать все", "Show all", "Барлығын көрсету"],
 
+  "cl.sections": ["Секции", "Sections", "Бөлімдер"],
+  "cl.addSection": ["Добавить секцию", "Add section", "Бөлім қосу"],
+  "cl.sectionName": ["Название секции", "Section name", "Бөлім атауы"],
+
   "err.network": ["Сервер не отвечает. Проверьте, что запущен uvicorn.", "The server is not responding. Check that uvicorn is running.", "Сервер жауап бермейді. uvicorn іске қосылғанын тексеріңіз."],
   "err.prefix": ["Ошибка", "Error", "Қате"],
 };
