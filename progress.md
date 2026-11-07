@@ -46,6 +46,18 @@
   Chats 95.2% / MAE 2.34 (24 dialogs); **calls 64.3% / MAE 24.5 (2 dialogs)** — p4-ru-001 off by 40.8
   (model: c04 20, c05 yes, c06 10 vs gold 15/no/7). By language: EN 97.6%, RU 91.8%, KZ 90.5%.
   Remaining weak spots: c06 middle steps (7 never hit), c05 "no" recall 50%, calls overall.
+- Calls work (2026-11-07). Call transcripts now rendered with time from call start, "пауза N с" for
+  ≥30 s gaps and operator turns during hold marked "клиент не слышит"; call checklist v3 adds
+  c01/c05/c06 clarifications. Clarifications alone changed nothing (model ignored rules placed before a
+  100-turn transcript), so the prompt was reordered for all channels: dialog → checklist → task, with a
+  mandatory verbatim quote in each explanation and the first operator turn named.
+  Dev chats 96.4% → 97.0% agreement (MAE 1.52 → 1.98, noise); dev calls 78.6% → 85.7%; all 4 scored
+  calls 75.0%. Calls stay noisy (5 dialogs, subjective gold) — further tuning would overfit our own
+  labels. **Caveat:** these call changes were informed by the 2 test-split calls, so the test number
+  for calls is no longer blind.
+- **Risk:** p4-ru-005 returns HTTP 500 from Gemma on every attempt with the new prompt (12 tries);
+  Gemma also hit a per-minute limit when two runs ran in parallel (run one at a time). Mitigation to
+  build: fallback model for persistently failing dialogs, flagged in the report.
 - Local engine proven: `ollama` + qwen3:1.7b on CPU evaluated p1-ru-001 end to end (valid JSON first
   call, 2.5k in / 1.2k out tokens) but took 605 s and graded leniently (total 100 vs gold 92.31) —
   fine to demo "works offline", not usable as the primary engine on this laptop.

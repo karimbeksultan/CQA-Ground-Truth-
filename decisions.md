@@ -32,6 +32,11 @@ Cerebras, OpenRouter, Mistral, local Ollama and a local FreeLLMAPI router. Every
 (`--model` is mandatory), so accuracy numbers stay comparable; local Ollama covers the
 "local LLM" side of the diversity criterion. Which engine is primary is decided by dev-split accuracy.
 
+## D9 — Prompt order: dialog first, rules and task last
+Clarifications placed before a 70–115-turn call transcript were ignored by the model. The prompt is
+now dialog → checklist → task, the task asks for a verbatim quote in every explanation, and the first
+operator turn is named. Chats did not regress (dev 96.4% → 97.0%), calls improved on dev.
+
 ## D7 — The prompt is generated from the checklist on every evaluation
 Every criterion field (rule, N/A rule, scale steps, guidance, allowed answers) is rendered into the
 prompt, so a criterion changed in the UI is applied immediately — the "process correctness" criterion.

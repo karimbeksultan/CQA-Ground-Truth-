@@ -6,7 +6,7 @@ import pytest
 
 from cqa import checklists, data_source
 from cqa.evaluators.llm_judge import EvaluationError, LLMJudge, extract_json, validate
-from cqa.evaluators.prompt import user_prompt
+from cqa.evaluators.prompt import render_transcript, user_prompt
 from cqa.llm import LLMError, LLMReply
 from cqa.llm.gemini import GeminiClient
 from cqa.scoring import score
@@ -50,6 +50,31 @@ def test_prompt_contains_every_criterion_rule_and_numbered_turns(chat):
     assert "[3] 00:40 OPERATOR: Здравствуйте!" in p
     assert "N/A: Данных для ответа хватало с самого начала." in p
     assert "20 — Все существенные вопросы закрыты" in p
+
+
+def test_call_rendering_relative_time_pauses_and_hold():
+    from cqa.models import Conversation
+    ts = lambda s: f"2026-11-03T13:{s // 60:02d}:{s % 60:02d}.1234567+00:00"
+    conv = Conversation(conversation_id="c", channel="voice call", language="RU", transcript=[
+        {"index": 0, "timestamp": ts(0), "speaker": "operator", "text": "Здравствуйте, меня зовут Тест."},
+        {"index": 1, "timestamp": ts(5), "speaker": "client", "text": "Вопрос\nпо счёту"},
+        {"index": 2, "timestamp": ts(6), "speaker": "system", "text": "Клиент находится на удержании."},
+        {"index": 3, "timestamp": ts(20), "speaker": "operator", "text": "Коллега, подскажи тариф."},
+        {"index": 4, "timestamp": ts(80), "speaker": "system", "text": "Клиент больше не находится на удержании."},
+        {"index": 5, "timestamp": ts(81), "speaker": "operator", "text": "Спасибо за ожидание."},
+    ])
+    out = render_transcript(conv)
+    assert "[0] 00:00 OPERATOR: Здравствуйте" in out and "[1] 00:05 CLIENT: Вопрос по счёту" in out
+    assert "[3] 00:20 OPERATOR (на удержании, клиент не слышит): Коллега" in out
+    assert "[4] 01:20 (пауза 60 с) SYSTEM" in out
+    assert "[5] 01:21 OPERATOR: Спасибо" in out
+    assert "Особенности звонка" in user_prompt(conv, checklists.load("call_default_v1"))
+
+
+def test_chat_rendering_is_unchanged(chat):
+    conv, cl = chat
+    assert "[3] 00:40 OPERATOR: Здравствуйте!" in render_transcript(conv)
+    assert "Особенности звонка" not in user_prompt(conv, cl)
 
 
 def test_prompt_follows_checklist_changes(chat):

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
 from cqa.models import Checklist, Conversation, Criterion
 
@@ -64,20 +65,73 @@ def _one_line(text: str) -> str:
     return _MARKER.sub(" ", " ".join(text.split()))
 
 
+PAUSE_SECONDS = 30
+_FRACTION = re.compile(r"(\.\d{6})\d+")
+CALL_NOTE = ("Особенности звонка: время указано от начала записи (мм:сс); «пауза N с» — тишина перед репликой "
+             "длиннее 30 секунд. Реплики с пометкой «на удержании» клиент не слышит: это внутренний разговор "
+             "оператора с коллегой, общение с клиентом по ним не оценивается. Ошибки распознавания речи "
+             "(искажённые слова) не считаются ошибками оператора, но смысл, порядок и полнота его ответов оцениваются.")
+
+
+def _parse_ts(value: str) -> datetime | None:
+    try:
+        return datetime.fromisoformat(_FRACTION.sub(r"\1", value.strip()))
+    except ValueError:
+        return None
+
+
+def _hold_state(text: str, current: bool) -> bool:
+    low = text.lower()
+    if "больше не находится на удержании" in low or "no longer on hold" in low:
+        return False
+    if "на удержании" in low or "on hold" in low:
+        return True
+    return current
+
+
 def render_transcript(conv: Conversation) -> str:
-    lines = (f"[{t.index}] {t.timestamp} {SPEAKER[t.speaker]}: {_one_line(t.text)}" for t in conv.transcript)
+    if conv.channel != "voice call":
+        lines = [f"[{t.index}] {t.timestamp} {SPEAKER[t.speaker]}: {_one_line(t.text)}" for t in conv.transcript]
+        return "<transcript>\n" + "\n".join(lines) + "\n</transcript>"
+    stamps = [_parse_ts(t.timestamp) for t in conv.transcript]
+    start = next((s for s in stamps if s is not None), None)
+    lines, on_hold, prev = [], False, None
+    for t, ts in zip(conv.transcript, stamps):
+        if ts is not None and start is not None:
+            secs = max(0, int((ts - start).total_seconds()))
+            when = f"{secs // 60:02d}:{secs % 60:02d}"
+            gap = (ts - prev).total_seconds() if prev is not None else 0
+            pause = f" (пауза {int(gap)} с)" if gap >= PAUSE_SECONDS else ""
+            prev = ts
+        else:
+            when, pause = t.timestamp, ""
+        who = SPEAKER[t.speaker]
+        if t.speaker == "operator" and on_hold:
+            who += " (на удержании, клиент не слышит)"
+        lines.append(f"[{t.index}] {when}{pause} {who}: {_one_line(t.text)}")
+        if t.speaker == "system":
+            on_hold = _hold_state(t.text, on_hold)
     return "<transcript>\n" + "\n".join(lines) + "\n</transcript>"
 
 
 def user_prompt(conv: Conversation, checklist: Checklist) -> str:
+    # Order matters for long calls: dialog first, then the rules and the task right before the answer,
+    # so the criteria are not lost behind a 100-turn transcript.
     ids = ", ".join(c.id for c in checklist.criteria)
+    first_op = next((t.index for t in conv.transcript if t.speaker == "operator"), None)
+    first_line = (f"Первая реплика оператора: [{first_op}]." if first_op is not None
+                  else "Оператор в диалоге не отвечал.")
     return (
-        f"{render_checklist(checklist)}\n\n"
         f"## Диалог {conv.conversation_id}\n"
         f"Канал: {CHANNEL.get(conv.channel, conv.channel)}. Язык клиента: {LANGUAGE.get(conv.language, conv.language)}. "
-        f"Реплик: {len(conv.transcript)} (номера 0–{len(conv.transcript) - 1}).\n\n"
+        f"Реплик: {len(conv.transcript)} (номера 0–{len(conv.transcript) - 1}). {first_line}\n"
+        + (f"{CALL_NOTE}\n" if conv.channel == "voice call" else "") + "\n"
         f"{render_transcript(conv)}\n\n"
-        f"## Задание\nОцени каждый критерий ровно один раз: {ids}. "
+        f"{render_checklist(checklist)}\n\n"
+        f"## Задание\nОцени работу оператора в диалоге выше по каждому критерию ровно один раз: {ids}. "
+        "Сверяй ответ с правилом и уточнением критерия, а не с общим впечатлением. "
+        "В explanation приводи дословную цитату (в кавычках) реплики, на которой основан вывод; "
+        "для пропущенного действия — цитату места, где оно ожидалось. "
         "Верни JSON: {\"criteria\": [{\"criterion_id\", \"evidence\": [номера], \"checked_range\": [начало, конец] или [], "
         "\"explanation\", \"answer\"}]}."
     )
