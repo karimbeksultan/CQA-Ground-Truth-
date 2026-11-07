@@ -1,0 +1,35 @@
+{
+  "error": "",
+  "isSuccess": true,
+  "data": {
+    "dataset_group_id": "TEST",
+    "total_records": 2,
+    "records": [
+      {
+        "conversation_id": "t-ru-001",
+        "channel": "agent chat",
+        "language": "RU",
+        "transcript": [
+          {"timestamp": "00:00", "speaker": "client", "text": "Как пополнить счёт?"},
+          {"timestamp": "00:02", "speaker": "bot", "text": "Соединяю с оператором."},
+          {"timestamp": "00:03", "speaker": "system", "text": "Эскалация на оператора."},
+          {"timestamp": "00:40", "speaker": "operator", "text": "Здравствуйте! Меня зовут Тест. Пополнить счёт можно в разделе «Пополнение»."},
+          {"timestamp": "00:55", "speaker": "client", "text": "Спасибо."},
+          {"timestamp": "01:05", "speaker": "operator", "text": "Могу ещё чем-то помочь? Хорошего дня!"}
+        ],
+        "audio_url": null
+      },
+      {
+        "conversation_id": "t-ru-call-001",
+        "channel": "voice call",
+        "language": "RU",
+        "transcript": [
+          {"timestamp": "2026-11-03T13:10:00.6388245+00:00", "speaker": "system", "text": "Агент присоединился к разговору с клиентом."},
+          {"timestamp": "2026-11-03T13:10:02.1000000+00:00", "speaker": "operator", "text": "Здравствуйте, меня зовут Тест, чем могу помочь?"},
+          {"timestamp": "2026-11-03T13:10:06.0000000+00:00", "speaker": "client", "text": "Не могу войти в приложение."}
+        ],
+        "audio_url": "https://example.invalid/audio/1"
+      }
+    ]
+  }
+}

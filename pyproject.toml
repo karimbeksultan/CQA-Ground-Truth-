@@ -1,0 +1,9 @@
+[project]
+name = "cqa"
+version = "0.1.0"
+description = "Conversation Quality Analytics prototype (Freedom Broker CQA hackathon)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,17 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# organizer data (fetched via API, may contain real call transcripts)
+data/raw/
+
+# runtime state
+data/db/
+runs/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+catboost_info/
+.pytest_cache/
