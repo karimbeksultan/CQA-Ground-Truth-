@@ -55,6 +55,8 @@ T+24h stop-code: last commit is judged. Defense: 5 minutes (see guide p.4).
 - Errors are recorded, never swallowed: per-conversation failures land in `run.json`.
 - Git: work on a branch, small commits, conventional messages. Author **karimbeksultan**
   (repo-local config), **no `Co-Authored-By` trailer**. Ask before push / force operations.
+- After every feature: update `docs/REQUIREMENTS.md` (organizer requirement → code → test → status,
+  open interpretations). The user reviews it against the organizers' documents before the next step.
 - Feature freeze at T+20h: after it only fixes, control-set processing, README, demo.
 - Reviews of critical code by a separate subagent (not the author).
 
