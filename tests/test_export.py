@@ -156,3 +156,26 @@ def test_record_variants_are_mapped_not_rejected():
     conv = data_source.parse(payload, rejected=rejected)[0]
     assert not rejected and conv.channel == "agent chat" and conv.language == "KZ"
     assert conv.transcript[0].speaker == "client" and conv.transcript[1].speaker == "system"
+
+
+def test_unknown_roles_without_an_operator_are_rejected_not_silently_scored():
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    rec = payload["data"]["records"][0]
+    for t in rec["transcript"]:
+        if t["speaker"] == "operator":
+            t["speaker"] = "консультант"   # a role we do not know: the operator would vanish
+    rejected: dict = {}
+    convs = data_source.parse(payload, rejected=rejected)
+    assert rec["conversation_id"] in rejected and "no operator" in rejected[rec["conversation_id"]]
+    payload2 = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    payload2["data"]["records"][0]["transcript"][0]["speaker"] = "Оператор"   # known RU variant
+    payload2["data"]["records"][0]["conversation_id"] = "ctl.2026-001"         # dots are fine
+    payload2["data"]["records"][0]["transcript"][1]["text"] = None              # missing text is ""
+    conv = data_source.parse(payload2)[0]
+    assert conv.conversation_id == "ctl.2026-001" and conv.transcript[0].speaker == "operator"
+
+
+def test_checklist_override_never_crosses_channels(convs):
+    chat, call = convs
+    assert checklists.for_conversation(chat, "chat_default_v1").id == "chat_default_v1"
+    assert checklists.for_conversation(call, "chat_default_v1").id == "call_default_v1"

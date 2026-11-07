@@ -56,8 +56,11 @@ CHANNELS = {"agent chat": "agent chat", "agent_chat": "agent chat", "chat": "age
             "voice call": "voice call", "voice_call": "voice call", "call": "voice call", "voice": "voice call",
             "phone": "voice call"}
 LANGUAGES = {"ru": "RU", "rus": "RU", "kz": "KZ", "kk": "KZ", "kaz": "KZ", "en": "EN", "eng": "EN"}
-SPEAKERS = {"client": "client", "customer": "client", "user": "client", "operator": "operator", "agent": "operator",
-            "bot": "bot", "assistant": "bot", "system": "system", "event": "system"}
+SPEAKERS = {"client": "client", "customer": "client", "user": "client", "клиент": "client", "клиент:": "client",
+            "operator": "operator", "agent": "operator", "оператор": "operator", "менеджер": "operator",
+            "специалист": "operator", "support": "operator", "specialist": "operator", "маман": "operator",
+            "bot": "bot", "assistant": "bot", "бот": "bot", "chatbot": "bot",
+            "system": "system", "event": "system", "система": "system", "жүйе": "system"}
 
 
 def _speaker(value: object) -> str:
@@ -65,9 +68,14 @@ def _speaker(value: object) -> str:
 
 
 def _record(rec: dict, group: str | None) -> Conversation:
+    raw_roles = [str(t["speaker"]).strip().lower() for t in rec["transcript"]]
     turns = [Turn(index=i, timestamp=str(t["timestamp"]),
-                  speaker=_speaker(t["speaker"]), text=t["text"])
+                  speaker=_speaker(t["speaker"]), text=str(t.get("text") or ""))
              for i, t in enumerate(rec["transcript"])]
+    unknown = sorted({r for r in raw_roles if r not in SPEAKERS})
+    if unknown and not any(t.speaker == "operator" for t in turns):
+        # never evaluate a dialog whose operator we could not recognise: that would be a wrong "ok"
+        raise ValueError(f"unknown speaker roles {unknown} and no operator turn")
     channel = str(rec["channel"]).strip().lower()
     language = str(rec["language"]).strip().lower()
     return Conversation(
@@ -125,7 +133,8 @@ def _write_atomic(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
-    tmp.replace(path)
+    from cqa.harness.runner import replace_with_retry
+    replace_with_retry(tmp, path)
 
 
 def import_file(group_id: str, file: Path) -> list[Conversation]:

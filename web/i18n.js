@@ -50,7 +50,7 @@ const S = {
   "job.finished": ["Оценка завершена: {done} из {total}", "Evaluation finished: {done} of {total}", "Бағалау аяқталды: {done} / {total}"],
   "job.failedN": ["ошибок: {n}", "failed: {n}", "қате: {n}"],
   "job.queued": ["В очереди: {total}", "Queued: {total}", "Кезекте: {total}"],
-  "job.hint": ["~1–2 мин на диалог, по 3 параллельно", "~1–2 min per dialog, 3 in parallel", "Әр диалогқа ~1–2 мин, қатар 3"],
+  "job.hint": ["~2–3 мин на диалог, по 3 параллельно", "~2–3 min per dialog, 3 in parallel", "Әр диалогқа ~1–2 мин, қатар 3"],
   "toast.imported": ["Импортировано диалогов: {n}", "Imported dialogs: {n}", "Импортталған диалогтар: {n}"],
   "toast.uploaded": ["Загружено: {ids}", "Uploaded: {ids}", "Жүктелді: {ids}"],
   "toast.jobStarted": ["Запущена оценка: {n}", "Evaluation started: {n}", "Бағалау басталды: {n}"],

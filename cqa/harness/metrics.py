@@ -8,6 +8,7 @@ and the same numbers per language and channel.
 from __future__ import annotations
 
 import math
+import random
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
@@ -23,6 +24,8 @@ class Pair:
     checklist: Checklist
     pred: dict[str, Answer]
     gold: dict[str, Answer]
+    split: str = ""   # train / dev / test of the gold file: test is the held-out number
+    engine: str = ""  # model that actually answered (a chain may mix engines)
 
 
 def _key(a: Answer) -> str:
@@ -53,8 +56,10 @@ def compare(pairs: list[Pair]) -> dict:
     agree_all: list[bool] = []
     total_errors: list[float] = []
     totals_one_side_missing: list[str] = []
-    group_errors: dict[str, dict[str, list[float]]] = {"language": defaultdict(list), "channel": defaultdict(list)}
-    group_agree: dict[str, dict[str, list[bool]]] = {"language": defaultdict(list), "channel": defaultdict(list)}
+    dims = ("language", "channel", "split", "engine")
+    group_errors: dict[str, dict[str, list[float]]] = {d: defaultdict(list) for d in dims}
+    group_agree: dict[str, dict[str, list[bool]]] = {d: defaultdict(list) for d in dims}
+    per_dialog: list[tuple[int, int]] = []  # (agreeing, scored) per dialog, for the bootstrap interval
     flag = Counter()
     worst = []
 
@@ -62,6 +67,8 @@ def compare(pairs: list[Pair]) -> dict:
         gold_score = score(p.checklist, p.gold)
         pred_score = score(p.checklist, p.pred)
         diffs = []
+        groups = {"language": p.language, "channel": p.channel, "split": p.split, "engine": p.engine}
+        d_ok = d_n = 0
         for c in p.checklist.criteria:
             g, pr = p.gold[c.id], p.pred[c.id]
             ok = _key(g) == _key(pr)
@@ -76,18 +83,23 @@ def compare(pairs: list[Pair]) -> dict:
                 flag[("gold_yes" if g == "yes" else "gold_no", "pred_yes" if pr == "yes" else "pred_no")] += 1
             else:
                 agree_all.append(ok)
-                group_agree["language"][p.language].append(ok)
-                group_agree["channel"][p.channel].append(ok)
+                d_ok += ok
+                d_n += 1
+                for dim, key in groups.items():
+                    if key:
+                        group_agree[dim][key].append(ok)
             if not ok:
                 diffs.append({"criterion": c.id, "gold": g, "pred": pr})
 
         if gold_score.total is not None and pred_score.total is not None:
             err = pred_score.total - gold_score.total
             total_errors.append(err)
-            group_errors["language"][p.language].append(err)
-            group_errors["channel"][p.channel].append(err)
+            for dim, key in groups.items():
+                if key:
+                    group_errors[dim][key].append(err)
         elif gold_score.total != pred_score.total:
             totals_one_side_missing.append(p.conversation_id)
+        per_dialog.append((d_ok, d_n))
         worst.append({
             "conversation_id": p.conversation_id, "language": p.language, "channel": p.channel,
             "gold_total": gold_score.total, "pred_total": pred_score.total,
@@ -119,11 +131,33 @@ def compare(pairs: list[Pair]) -> dict:
         "false_alarms": flag[("gold_no", "pred_yes")],
     }
 
+    # majority-class baseline: always answer each criterion's most common gold class
+    maj_ok = maj_n = 0
+    for cid, st in per_crit.items():
+        if st["type"] == "flag":
+            continue
+        golds = Counter({g: sum(preds.values()) for g, preds in st["confusion"].items()})
+        maj_ok += golds.most_common(1)[0][1]
+        maj_n += sum(golds.values())
+    # 95% interval for criterion agreement: bootstrap over dialogs (criteria within a dialog are not independent)
+    ci = None
+    if len(per_dialog) >= 5:
+        rng = random.Random(0)
+        stats = []
+        for _ in range(2000):
+            sample = [per_dialog[rng.randrange(len(per_dialog))] for _ in per_dialog]
+            n = sum(s[1] for s in sample)
+            stats.append(sum(s[0] for s in sample) / n if n else 0.0)
+        stats.sort()
+        ci = [round(stats[49], 4), round(stats[1949], 4)]
+
     worst.sort(key=lambda w: (w["abs_err"] is None, -(w["abs_err"] or 0), -len(w["diffs"])))
     return {
         "n_conversations": len(pairs),
         "overall": {
             "criterion_agreement": _mean([float(x) for x in agree_all]),
+            "criterion_agreement_ci95": ci,
+            "majority_baseline": round(maj_ok / maj_n, 4) if maj_n else None,
             "total": _total_stats(total_errors),
             "total_missing_on_one_side": totals_one_side_missing,
             "gross_error": gross,
@@ -133,7 +167,7 @@ def compare(pairs: list[Pair]) -> dict:
             dim: {k: {"agreement": _mean([float(x) for x in group_agree[dim][k]]),
                       "total": _total_stats(group_errors[dim].get(k, []))}
                   for k in sorted(group_agree[dim])}
-            for dim in ("language", "channel")
+            for dim in dims if group_agree[dim]
         },
         "worst": worst[:15],
     }

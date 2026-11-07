@@ -12,6 +12,8 @@ Answer = Union[Literal["yes", "no", "na"], int]
 # ids end up in file names and URLs: letters, digits, "_" and "-" only (no paths, no dots)
 SLUG_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
 Slug = Annotated[str, StringConstraints(pattern=SLUG_PATTERN)]
+# conversation ids come from the organizer API: dots allowed, never used as file names
+ConversationId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")]
 
 
 class Turn(BaseModel):
@@ -22,7 +24,7 @@ class Turn(BaseModel):
 
 
 class Conversation(BaseModel):
-    conversation_id: Slug
+    conversation_id: ConversationId
     channel: Channel
     language: Literal["RU", "KZ", "EN"]
     transcript: list[Turn]

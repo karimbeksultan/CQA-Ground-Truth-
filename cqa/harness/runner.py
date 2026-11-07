@@ -209,12 +209,25 @@ def rerun_failed(run_dir: Path, *, workers: int = 4, convs: list[Conversation] |
     return {"retried": len(plan), "fixed": fixed}
 
 
+def replace_with_retry(src: Path, dst: Path, attempts: int = 8) -> None:
+    """Atomic replace that survives Windows sharing violations (antivirus, indexer or a reader holding the
+    file for a moment), which otherwise fail an export or rerun at random."""
+    for i in range(attempts):
+        try:
+            src.replace(dst)
+            return
+        except PermissionError:
+            if i == attempts - 1:
+                raise
+            time.sleep(0.05 * (2 ** i))
+
+
 def _write_predictions(run_dir: Path, records: list[dict]) -> None:
     tmp = run_dir / "predictions.jsonl.tmp"
     with tmp.open("w", encoding="utf-8") as f:
         for rec in records:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    tmp.replace(run_dir / "predictions.jsonl")
+    replace_with_retry(tmp, run_dir / "predictions.jsonl")
 
 
 def load_predictions(run_dir: Path) -> list[dict]:
@@ -261,7 +274,12 @@ def score_run(run_dir: Path, gold: dict[str, ground_truth.GoldLabel]) -> dict:
             continue
         ev = Evaluation.model_validate(rec["evaluation"])
         pairs.append(Pair(conversation_id=cid, language=rec["language"], channel=rec["channel"],
-                          checklist=checklist, pred=ev.answers(), gold=g.complete_answers()))
+                          checklist=checklist, pred=ev.answers(), gold=g.complete_answers(),
+                          split=g.split or "", engine=ev.model or ""))
+    if not pairs and skipped["checklist_changed"]:
+        # never overwrite a run's report with an empty one: the rules it was scored by are gone from disk
+        raise ValueError(f"checklists changed since this run ({len(skipped['checklist_changed'])} dialogs): "
+                         "start a new run instead of re-scoring this one")
     metrics = compare(pairs) if pairs else {"n_conversations": 0}
     metrics["skipped"] = skipped
     (run_dir / "metrics.json").write_text(json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8")

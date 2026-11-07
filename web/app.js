@@ -610,7 +610,7 @@ async function cardView(convId, evalId) {
     && !(j.evaluation_ids || []).some((id) => evals.some((e) => e.id === id)));
   const checklistSelect = h("select", { class: "input", "aria-label": t("dialogs.checklist"), style: "max-width:240px" },
     h("option", { value: "" }, t("dialogs.auto")),
-    state.checklists.map((c) => h("option", { value: c.id, selected: ev && c.id === ev.checklist_id }, `${c.name} · v${c.version}`)));
+    state.checklists.map((c) => h("option", { value: c.id, selected: state.checklistChoice ? c.id === state.checklistChoice : ev && c.id === ev.checklist_id }, `${c.name} · v${c.version}`)));
   const engineSelect = state.engineOptions.length > 1 ? h("select", { class: "input", "aria-label": t("engine.pick"), style: "max-width:220px" },
     state.engineOptions.map(([v, l]) => h("option", { value: v, selected: v === (state.engineChoice || "") }, l))) : null;
   const evalButton = state.role === "analyst" ? h("button", { class: "btn primary sm", type: "button", icon: "run", disabled: Boolean(runningJob),
@@ -797,6 +797,8 @@ function checklistsView(id) {
       let saved;
       if (asNew) {
         body.id = newIdInput.value.trim() || autoId();
+        body.version = 1;
+        if (state.checklists.some((c) => c.name === body.name)) body.name = `${body.name} (${body.id})`;
         saved = await api("/api/checklists", { method: "POST", body: JSON.stringify(body) });
       } else {
         saved = await api(`/api/checklists/${encodeURIComponent(body.id)}`, { method: "PUT", body: JSON.stringify(body) });

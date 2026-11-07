@@ -149,7 +149,8 @@ def create_app(service: Service | None = None) -> FastAPI:
 
     @app.post("/api/conversations/upload", status_code=201)
     async def upload(request: Request):
-        if "application/json" not in request.headers.get("content-type", ""):
+        media_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+        if media_type != "application/json":  # exact: a CORS-safelisted text/plain cannot sneak through
             return error(415, "unsupported_media_type", "send the transcript as application/json")
         chunks, size = [], 0
         async for chunk in request.stream():

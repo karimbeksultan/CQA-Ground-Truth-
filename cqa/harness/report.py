@@ -30,6 +30,9 @@ def render(meta: dict, m: dict) -> str:
     lines += ["## Overall", "",
               "| metric | value |", "|---|---|",
               f"| criterion agreement (scored criteria) | {_pct(o['criterion_agreement'])} |",
+              f"| 95% interval, bootstrap over dialogs | "
+              f"{(_pct(o['criterion_agreement_ci95'][0]) + ' – ' + _pct(o['criterion_agreement_ci95'][1])) if o.get('criterion_agreement_ci95') else '—'} |",
+              f"| majority-class baseline (always the most common gold answer) | {_pct(o.get('majority_baseline'))} |",
               f"| total MAE / RMSE | {_num(t['mae'])} / {_num(t['rmse'])} |",
               f"| total within ±5 / ±10 | {_pct(t['within_5'])} / {_pct(t['within_10'])} |",
               f"| total bias (pred − gold) | {_num(t.get('bias'))} |",

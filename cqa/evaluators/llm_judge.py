@@ -96,6 +96,43 @@ def validate(data: dict, conv: Conversation, checklist: Checklist) -> tuple[list
     return [seen[c.id] for c in checklist.criteria if c.id in seen], errors
 
 
+_QUOTE = re.compile(r"«([^»]{4,400})»|\"([^\"]{4,400})\"")
+_ELLIPSIS = re.compile(r"\.\.\.|…|\[\.\.\.\]")
+_LABELS = {"да", "нет", "n/a", "na", "yes", "no", "н/п"}
+
+
+def _norm(text: str) -> str:
+    text = text.lower().replace("ё", "е")
+    text = re.sub(r"[\s\u00a0]+", " ", text)
+    return text.strip(" .,!?;:—–-\"'«»()")
+
+
+def quote_issues(results: list[CriterionResult], conv: Conversation, checklist: Checklist | None = None) -> list[str]:
+    """Quotes in explanations must come from the dialog itself: every «…» fragment (pieces joined by "…"
+    are checked one by one) has to be found in the transcript. Ignored: answer labels, single words (word
+    forms differ) and phrases quoted from the checklist's own rules (citing a rule is not citing the dialog).
+    Returns repair messages, empty when every quote is grounded."""
+    corpus = _norm(" ".join(t.text for t in conv.transcript))
+    rules = ""
+    if checklist is not None:
+        rules = _norm(" ".join(" ".join(filter(None, [c.name, c.description, c.na_rule or "", c.guidance or ""]
+                                                   + [s.description for s in (c.scale or [])]))
+                               for c in checklist.criteria))
+    issues = []
+    for r in results:
+        for m in _QUOTE.finditer(r.explanation or ""):
+            quote = m.group(1) or m.group(2) or ""
+            for piece in _ELLIPSIS.split(quote):
+                p = _norm(piece)
+                if len(p) < 8 or p in _LABELS or len(p.split()) < 2 or (rules and p in rules):
+                    continue
+                if p not in corpus:
+                    issues.append(f"{r.criterion_id}: цитата «{piece.strip()[:80]}» не найдена в диалоге — "
+                                  "приведи дословный фрагмент реплики или убери кавычки")
+                    break
+    return issues
+
+
 class LLMJudge:
     def __init__(self, client: LLMClient, name: str, repair_rounds: int = 1):
         self.client = client
@@ -119,10 +156,15 @@ class LLMJudge:
                 results, errors = validate(extract_json(raw), conv, checklist)
             except (ValueError, json.JSONDecodeError) as exc:
                 results, errors = [], [f"ответ не является корректным JSON: {exc}"]
-            if not errors:
+            quotes = quote_issues(results, conv, checklist) if not errors else []
+            last_round = round_ >= self.repair_rounds
+            if not errors and (not quotes or last_round):
+                if quotes:  # still ungrounded after the repair round: kept, but recorded, never silent
+                    usage["ungrounded_quotes"] = quotes
                 return Evaluation(conversation_id=conv.conversation_id, checklist_id=checklist.id,
                                   checklist_version=checklist.version, evaluator=self.name, model=self.model,
                                   results=results, usage=usage, raw_response=raw)
+            errors = errors + quotes
             if round_ < self.repair_rounds:
                 messages += [Message("model", raw),
                              Message("user", "В ответе ошибки:\n- " + "\n- ".join(errors)

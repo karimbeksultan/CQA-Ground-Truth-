@@ -198,7 +198,7 @@ class Service:
             body = {"data": {"records": [payload]}}
         else:
             raise ValueError("upload must be a JSON object or a list of records")
-        body["data"].setdefault("dataset_group_id", UPLOAD_GROUP)
+        body["data"]["dataset_group_id"] = UPLOAD_GROUP  # an upload can never join an organizer group
         try:
             convs = data_source.parse(body)
         except (KeyError, TypeError, AttributeError) as exc:
@@ -356,9 +356,10 @@ class Service:
                 continue
             as_pred = lambda ev: {"evaluation": ev.get("evaluation"), "score": ev.get("score"),
                                   "error": None if ev["status"] == "done" else (ev.get("error") or "оценка не удалась")}
-            # the newest evaluation that fits the organizers' 8 criterion codes: a live demo swap that adds
-            # a new criterion (c09) or changes a type must not turn the submitted file into errors
+            # the submitted file uses the default (protected) checklists: the newest evaluation made with one;
+            # a live demo swap (new id, new meaning or a new criterion) never leaks into it
             fitting = next((ev for ev in reversed(evs) if ev["status"] == "done"
+                            and checklists.is_protected(ev.get("checklist_id") or "")
                             and export.record(as_pred(ev), c)["status"] == "ok"), None)
             preds[c.conversation_id] = as_pred(fitting or evs[-1])
         return export.build_from_predictions(preds, convs, team_name, "chain")
@@ -397,6 +398,13 @@ class Service:
                   engine_specs: list[str] | None = None) -> dict:
         if not conversation_ids:
             raise ValueError("no conversations selected")
+        # a public demo link must not be able to burn the LLM quota the control run needs
+        max_ids = int(os.environ.get("CQA_MAX_JOB_IDS", "100") or 100)
+        if len(conversation_ids) > max_ids:
+            raise ValueError(f"at most {max_ids} dialogs per job (CQA_MAX_JOB_IDS)")
+        active = [j for j in self.store.list("jobs") if j["status"] in ("queued", "running")]
+        if len(active) >= int(os.environ.get("CQA_MAX_ACTIVE_JOBS", "2") or 2):
+            raise ConflictError("too many evaluation jobs are running; wait for one to finish")
         for cid in conversation_ids:
             self.store.get("conversations", cid)  # fail fast on unknown ids
         if checklist_id:

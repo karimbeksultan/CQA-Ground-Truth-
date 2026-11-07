@@ -404,3 +404,21 @@ def test_results_skip_a_demo_evaluation_that_does_not_fit_the_format(env):
     rec = next(r for r in client.get("/api/results", params={"group_id": "TEST", "team": "T"}).json()["results"]
                if r["conversation_id"] == "t-ru-001")
     assert rec["status"] == "ok" and {c["criterion_id"] for c in rec["criteria"]} >= {"empathy"}
+
+
+def test_upload_needs_exact_json_and_stays_out_of_organizer_groups(env):
+    client, svc, *_ = env
+    rec = json.loads(FIXTURE.read_text(encoding="utf-8"))["data"]["records"][0]
+    body = json.dumps({"data": {"dataset_group_id": "DEV", "records": [{**rec, "conversation_id": "sneaky"}]}})
+    assert client.post("/api/conversations/upload", content=body,
+                       headers={"Content-Type": "text/plain; x=application/json"}).status_code == 415
+    assert client.post("/api/conversations/upload", content=body, headers=JSON).status_code == 201
+    assert svc.store.get("conversations", "sneaky")["group_id"] == "UPLOAD"
+
+
+def test_jobs_are_capped(env, monkeypatch):
+    client, *_ = env
+    client.post("/api/datasets/TEST/import")
+    monkeypatch.setenv("CQA_MAX_JOB_IDS", "1")
+    r = client.post("/api/evaluations", json={"conversation_ids": ["t-ru-001", "t-ru-call-001"]})
+    assert r.status_code == 400 and "at most 1" in r.text

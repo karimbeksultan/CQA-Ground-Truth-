@@ -85,6 +85,8 @@ def cmd_run(a: argparse.Namespace) -> None:
         specs = [str(s) for s in engines.configured()]
         kwargs["engines"] = (",".join(s for s in specs if not s.startswith("ollama:")) if a.engines == "cloud"
                              else a.engines)
+        if not kwargs["engines"]:
+            sys.exit("--engines cloud: no cloud engine is configured in CQA_ENGINES")
     if a.no_json_mode:
         kwargs["json_mode"] = False
     out = runner.run(a.group, a.evaluator, checklist_override=a.checklist,
@@ -124,9 +126,9 @@ def cmd_export(a: argparse.Namespace) -> None:
     rejected: dict[str, str] = {}
     convs = data_source.load(meta["group_id"], rejected=rejected)  # every dialog, ids exactly as the API gives them
     doc = export.build(run_dir, convs, team, rejected)
-    if a.set == "prod" and len(doc["results"]) != 10 and not a.out:
+    if a.set == "prod" and len(doc["results"]) != 10 and not a.out and not a.force:
         sys.exit(f"ERROR: prod must hold exactly 10 dialogs, the group has {len(doc['results'])} — check the group id "
-                 "(nothing written)")
+                 "(nothing written; --force writes it anyway)")
     out = Path(a.out) if a.out else runner.ROOT / "results" / a.set / "results.json"
     export.write(doc, out)
     errors = [r for r in doc["results"] if r["status"] == "error"]
@@ -218,6 +220,7 @@ def main(argv: list[str] | None = None) -> None:
     ex = sub.add_parser("export", help="write the organizers' results.json from a run")
     ex.add_argument("--run", required=True); ex.add_argument("--set", required=True, choices=["dev", "prod"])
     ex.add_argument("--team", help="team name (default: CQA_TEAM_NAME)"); ex.add_argument("--out")
+    ex.add_argument("--force", action="store_true", help="write prod even if the group does not hold exactly 10 dialogs")
     ex.set_defaults(fn=cmd_export)
     cr = sub.add_parser("check-results", help="validate a results.json against the format (and the group ids)")
     cr.add_argument("file"); cr.add_argument("--group", help="also require exactly this group's ids")

@@ -253,3 +253,32 @@ def test_na_must_cite_the_turn_that_shows_the_condition(chat):
     items[2] = {**items[2], "evidence": [], "checked_range": []}   # c03 N/A without any turn
     _, errors = validate({"criteria": items}, conv, cl)
     assert any(e.startswith("c03") and "N/A" in e for e in errors)
+
+
+def test_quotes_must_come_from_the_dialog_with_one_repair(chat):
+    conv, cl = chat
+    first_op = next(t for t in conv.transcript if t.speaker == "operator")
+    real = " ".join(first_op.text.split()[:4])
+    invented = [dict(i) for i in GOOD]
+    invented[0] = {**invented[0], "explanation": "Поздоровался: «Добрый вечер, меня зовут Аскар, чем помочь»."}
+    grounded = [dict(i) for i in GOOD]
+    grounded[0] = {**grounded[0], "explanation": f"Поздоровался: «{real}»."}
+    client = FakeClient([json.dumps({"criteria": invented}), json.dumps({"criteria": grounded})])
+    ev = LLMJudge(client, name="fake").evaluate(conv, cl)
+    assert ev.usage["calls"] == 2 and "ungrounded_quotes" not in ev.usage
+    assert "не найдена в диалоге" in client.calls[1][-1].text
+
+    # still invented after the repair: accepted, but recorded on the evaluation
+    stubborn = FakeClient([json.dumps({"criteria": invented})] * 2)
+    ev2 = LLMJudge(stubborn, name="fake").evaluate(conv, cl)
+    assert ev2.usage["calls"] == 2 and ev2.usage["ungrounded_quotes"][0].startswith("c01")
+
+
+def test_answer_labels_and_ellipsis_pieces_are_not_false_alarms(chat):
+    conv, cl = chat
+    t = [x.text for x in conv.transcript if x.speaker == "operator"][0].split()
+    items = [dict(i) for i in GOOD]
+    items[0] = {**items[0], "explanation": f"Ответ «Да»: «{' '.join(t[:3])} … {' '.join(t[-3:])}»."}
+    results, errors = validate({"criteria": items}, conv, cl)
+    from cqa.evaluators.llm_judge import quote_issues
+    assert not errors and quote_issues(results, conv) == []

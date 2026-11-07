@@ -46,8 +46,14 @@ def fingerprint(checklist: Checklist) -> str:
 
 def for_conversation(conv: Conversation, override: str | None = None,
                      directory: Path = CHECKLIST_DIR) -> Checklist:
-    """Explicit checklist id, or the channel default (chat vs call)."""
-    return load(override or DEFAULT_BY_CHANNEL[conv.channel], directory)
+    """Explicit checklist id, or the channel default (chat vs call). An override made for the other channel
+    (a chat checklist on a call) is not applied: that dialog keeps its own channel's default."""
+    if override:
+        chosen = load(override, directory)
+        channel = "call" if conv.channel == "voice call" else "chat"
+        if chosen.channel in ("any", channel):
+            return chosen
+    return load(DEFAULT_BY_CHANNEL[conv.channel], directory)
 
 
 def is_protected(checklist_id: str) -> bool:
