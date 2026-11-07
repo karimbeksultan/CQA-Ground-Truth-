@@ -5,12 +5,15 @@
   gt-status    --group DEV                     labeling progress per split and status
   run          --group DEV --evaluator NAME    evaluate and (if gold exists) score -> runs/<id>/
   compare      --run runs/<id> [--group DEV]   re-score an existing run against current gold
+  export       --run runs/<id> --set dev|prod  write results/<set>/results.json (organizers' format 1.0)
+  check-results FILE [--group G]               validate a results.json before push
   checklists                                   list checklists
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter
 from pathlib import Path
@@ -97,6 +100,35 @@ def cmd_compare(a: argparse.Namespace) -> None:
     print(f"scored {m.get('n_conversations', 0)} conversations -> {run_dir / 'report.md'}")
 
 
+def cmd_export(a: argparse.Namespace) -> None:
+    from cqa.harness import export
+    run_dir = Path(a.run)
+    meta = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    team = a.team or os.environ.get("CQA_TEAM_NAME", "").strip()
+    if not team:
+        sys.exit("team name: pass --team or set CQA_TEAM_NAME in .env")
+    convs = data_source.load(meta["group_id"])  # every dialog of the group, ids exactly as the API gives them
+    doc = export.build(run_dir, convs, team)
+    out = Path(a.out) if a.out else runner.ROOT / "results" / a.set / "results.json"
+    export.write(doc, out)
+    errors = [r for r in doc["results"] if r["status"] == "error"]
+    print(f"{out}: {len(doc['results'])} dialogs of {meta['group_id']}, {len(errors)} errors, "
+          f"model {doc['model']['mode']}: {doc['model']['name']}")
+    for r in errors:
+        print(f"  ERROR {r['conversation_id']}: {r['error'][:200]}")
+    if a.set == "prod" and len(doc["results"]) != 10:
+        print(f"  WARNING: prod must hold exactly 10 dialogs, this has {len(doc['results'])}")
+
+
+def cmd_check_results(a: argparse.Namespace) -> None:
+    from cqa.harness import export
+    doc = json.loads(Path(a.file).read_text(encoding="utf-8"))
+    expected = [c.conversation_id for c in data_source.load(a.group)] if a.group else None
+    export.check(doc, expected_ids=expected)
+    n_err = sum(r["status"] == "error" for r in doc["results"])
+    print(f"OK: {len(doc['results'])} dialogs, {n_err} errors, schema {doc['schema_version']}")
+
+
 def cmd_checklists(_: argparse.Namespace) -> None:
     for cl in checklists.list_all():
         weights = sum(c.weight for c in cl.criteria)
@@ -104,7 +136,9 @@ def cmd_checklists(_: argparse.Namespace) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    from dotenv import load_dotenv
     _utf8_stdout()
+    load_dotenv(runner.ROOT / ".env")
     p = argparse.ArgumentParser(prog="python -m cqa")
     sub = p.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("fetch"); f.add_argument("--group", default="DEV"); f.add_argument("--refresh", action="store_true")
@@ -134,6 +168,13 @@ def main(argv: list[str] | None = None) -> None:
     rr.set_defaults(fn=cmd_rerun)
     c = sub.add_parser("compare"); c.add_argument("--run", required=True); c.add_argument("--group")
     c.set_defaults(fn=cmd_compare)
+    ex = sub.add_parser("export", help="write the organizers' results.json from a run")
+    ex.add_argument("--run", required=True); ex.add_argument("--set", required=True, choices=["dev", "prod"])
+    ex.add_argument("--team", help="team name (default: CQA_TEAM_NAME)"); ex.add_argument("--out")
+    ex.set_defaults(fn=cmd_export)
+    cr = sub.add_parser("check-results", help="validate a results.json against the format (and the group ids)")
+    cr.add_argument("file"); cr.add_argument("--group", help="also require exactly this group's ids")
+    cr.set_defaults(fn=cmd_check_results)
     sub.add_parser("checklists").set_defaults(fn=cmd_checklists)
     a = p.parse_args(argv)
     a.fn(a)

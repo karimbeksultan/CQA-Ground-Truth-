@@ -19,6 +19,31 @@ each verdict, appeal a criterion and record the reviewer's decision.
    original → final.
 4. **Чек-листы**: edit a criterion (or «Сохранить как новый»), then «Оценить диалоги этим чек-листом».
 
+## Submitting results (appendix "Как сдать результаты", format 1.0)
+
+`results/dev/results.json` (all 65 DEV dialogs) and `results/prod/results.json` (the 10 control
+dialogs) are produced by the system, not by hand. Control hour (T+23 → T+24), with the new group id
+from the organizers in place of `<GROUP>`:
+
+```bash
+.venv\Scripts\python -m cqa fetch --group <GROUP>
+.venv\Scripts\python -m cqa run --group <GROUP> --evaluator chain --workers 3
+.venv\Scripts\python -m cqa rerun --run runs/<run-id>
+.venv\Scripts\python -m cqa export --run runs/<run-id> --set prod
+.venv\Scripts\python -m cqa check-results results/prod/results.json --group <GROUP>
+```
+
+then `git add results/prod/results.json`, commit and **push** (a local commit does not count).
+`rerun` re-evaluates only failed dialogs; anything still failing is written with `status: "error"` and
+the reason, never as a zero. The team name comes from `CQA_TEAM_NAME` in `.env` (or `--team`).
+
+Mapping: checklist ids c01…c08 → `contact, discovery, identification, consultation, empathy, dialogue,
+closure, critical`; Да/Нет/N/A → `true/false/null`; scale answers stay numbers; `evidence_turns` count
+from 1 over the original transcript array (the model and the UI use the same numbering);
+`final_score` is our deterministic total (N/A weight redistributed, half-up to 2 decimals) and
+`critical_flag` equals `critical` without zeroing the total. If a criterion is replaced in the UI
+at the control step, keep its id (c01…c08) so the file keeps the 8 codes the format requires.
+
 ## Run the server
 
 ```bash

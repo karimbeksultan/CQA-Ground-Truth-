@@ -46,6 +46,16 @@ Cerebras, OpenRouter, Mistral, local Ollama and a local FreeLLMAPI router. Every
 - Audio proxy is an SSRF surface: only https to allowed hosts (organizer API host, *.dynamics.com,
   or CQA_AUDIO_HOSTS) resolving to public IPs, checked on every redirect; uploads drop audio links.
 
+## D11 — Results file follows the organizers' format 1.0; turns are numbered from 1
+The appendix fixes the submission: `results/{dev,prod}/results.json`, criterion codes instead of
+c01…c08, true/false/null values, evidence turns counted from 1 over the original transcript array,
+failed dialogs kept as `status: "error"`. `cqa export` builds the file from a run and validates it
+(`cqa check-results`) against the format and the group's ids from the API. To keep the rationale text
+and `evidence_turns` consistent, the model now sees turns numbered [1]…[N] and the UI shows the same
+numbers; internally turns stay 0-based array positions. A missed action has no single turn, so its
+`evidence_turns` list the checked range. The prod file is produced by the same CLI path in the control
+hour; nothing is pre-computed.
+
 ## D9 — Prompt order: dialog first, rules and task last
 Clarifications placed before a 70–115-turn call transcript were ignored by the model. The prompt is
 now dialog → checklist → task, the task asks for a verbatim quote in every explanation, and the first
