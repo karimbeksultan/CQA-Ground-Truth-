@@ -32,6 +32,20 @@ Cerebras, OpenRouter, Mistral, local Ollama and a local FreeLLMAPI router. Every
 (`--model` is mandatory), so accuracy numbers stay comparable; local Ollama covers the
 "local LLM" side of the diversity criterion. Which engine is primary is decided by dev-split accuracy.
 
+## D10 — Backend: FastAPI + SQLite, background jobs, snapshot re-scoring
+- Evaluations take ~100 s with Gemma, so POST /api/evaluations queues a job and the UI polls
+  /api/jobs/{id}; jobs cut off by a restart resume from the first unfinished dialog.
+- Each evaluation stores a snapshot of the checklist it used; appeal decisions re-score against the
+  snapshot, so replacing a criterion at the control step never changes past results.
+- The API uses an engine chain (CQA_ENGINES): primary Gemma, fallback Gemini; the engine and any
+  failed engines are recorded on the evaluation. Accuracy runs (python -m cqa run) stay single-engine.
+- Audio: the organizers' audio_url is an HTML player page; the API resolves the mp3 link from it and
+  streams it with Range support. Signed links never reach the browser.
+- Storage is stdlib sqlite3 (no ORM dependency, WAL); data/db/ is gitignored. One server process per
+  database: no `--reload` / multiple workers, otherwise two processes would resume the same jobs.
+- Audio proxy is an SSRF surface: only https to allowed hosts (organizer API host, *.dynamics.com,
+  or CQA_AUDIO_HOSTS) resolving to public IPs, checked on every redirect; uploads drop audio links.
+
 ## D9 — Prompt order: dialog first, rules and task last
 Clarifications placed before a 70–115-turn call transcript were ignored by the model. The prompt is
 now dialog → checklist → task, the task asks for a verbatim quote in every explanation, and the first

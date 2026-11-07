@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 Speaker = Literal["client", "operator", "bot", "system"]
 Channel = Literal["agent chat", "voice call"]
 Answer = Union[Literal["yes", "no", "na"], int]
+# ids end up in file names and URLs: letters, digits, "_" and "-" only (no paths, no dots)
+SLUG_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+Slug = Annotated[str, StringConstraints(pattern=SLUG_PATTERN)]
 
 
 class Turn(BaseModel):
@@ -19,7 +22,7 @@ class Turn(BaseModel):
 
 
 class Conversation(BaseModel):
-    conversation_id: str
+    conversation_id: Slug
     channel: Channel
     language: Literal["RU", "KZ", "EN"]
     transcript: list[Turn]
@@ -33,12 +36,12 @@ class ScaleStep(BaseModel):
 
 
 class Section(BaseModel):
-    id: str
+    id: Slug
     name: str
 
 
 class Criterion(BaseModel):
-    id: str
+    id: Slug
     name: str
     type: Literal["binary", "scale", "flag"]
     weight: float = Field(ge=0)
@@ -47,7 +50,7 @@ class Criterion(BaseModel):
     na_rule: str | None = None
     scale: list[ScaleStep] | None = None
     guidance: str | None = None
-    section: str | None = None
+    section: Slug | None = None
 
     @model_validator(mode="after")
     def _check_type_fields(self) -> "Criterion":
@@ -81,7 +84,7 @@ class Criterion(BaseModel):
 
 
 class Checklist(BaseModel):
-    id: str
+    id: Slug
     name: str
     version: int = 1
     channel: Literal["chat", "call", "any"] = "any"

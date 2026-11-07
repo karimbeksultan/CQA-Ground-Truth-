@@ -58,6 +58,16 @@
 - **Risk:** p4-ru-005 returns HTTP 500 from Gemma on every attempt with the new prompt (12 tries);
   Gemma also hit a per-minute limit when two runs ran in parallel (run one at a time). Mitigation to
   build: fallback model for persistently failing dialogs, flagged in the report.
+- **Backend API** (FastAPI, `uvicorn cqa.api:create_app --factory`): checklist CRUD with versioning,
+  dataset import by group_id, transcript upload, background evaluation jobs (resume after restart,
+  no duplicates), engine fallback chain (Gemma → Gemini, recorded), appeals and reviewer decisions
+  re-scored against the evaluation's checklist snapshot, call audio proxy (organizer player page →
+  short-lived mp3, Range for seeking), per-turn audio offsets, cost per evaluation.
+  Independent review: 6 major findings fixed — appeal/decision race (service lock, evaluation written
+  before the appeal is closed), job threads that could die, resume duplicates, SSRF in the audio proxy
+  (https + allowed hosts + public IPs on every redirect, 1 MB page cap, audio/* only), upload memory cap,
+  uploads can no longer carry audio links or overwrite dialogs. 89 tests green; live: p1-ru-001 via API
+  = gold 92.31, both call recordings stream (206, audio/mpeg).
 - Local engine proven: `ollama` + qwen3:1.7b on CPU evaluated p1-ru-001 end to end (valid JSON first
   call, 2.5k in / 1.2k out tokens) but took 605 s and graded leniently (total 100 vs gold 92.31) —
   fine to demo "works offline", not usable as the primary engine on this laptop.

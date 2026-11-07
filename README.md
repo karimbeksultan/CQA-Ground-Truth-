@@ -4,8 +4,22 @@ Prototype for the Freedom Broker CQA hackathon: configure a checklist, evaluate 
 in a chat or call transcript (RU / KZ / EN), see points, explanations and the exact turns behind
 each verdict, appeal a criterion and record the reviewer's decision.
 
-> Status: data adapter, checklist engine, deterministic scoring, evaluation harness and the Gemini
-> evaluator are in place. API server and UI are next (see `progress.md`, `docs/REQUIREMENTS.md`).
+> Status: data adapter, checklist engine, deterministic scoring, evaluation harness, LLM evaluators
+> and the HTTP API (jobs, appeals, audio) are in place; the web UI is next (see `progress.md`,
+> `docs/REQUIREMENTS.md`). Accuracy on our sealed test split: 92.9% criterion agreement, total MAE 4.04.
+
+## Run the server
+
+```bash
+.venv\Scripts\python -m uvicorn cqa.api:create_app --factory --port 8000
+```
+
+Then open http://localhost:8000 (UI) or http://localhost:8000/docs (API). Typical flow:
+`POST /api/datasets/DEV/import` → `POST /api/evaluations {"conversation_ids": [...]}` (returns a job) →
+`GET /api/jobs/{id}` → `GET /api/evaluations/{id}` → `POST /api/evaluations/{id}/appeals` →
+`POST /api/appeals/{id}/decision`. Checklists: `GET/POST /api/checklists`, `PUT /api/checklists/{id}`.
+Transcript upload: `POST /api/conversations/upload` (organizer JSON format). Call audio:
+`GET /api/conversations/{id}/audio`.
 
 ## Run in 3 commands (Windows, Python 3.11+)
 

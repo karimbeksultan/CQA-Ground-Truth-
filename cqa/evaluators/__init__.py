@@ -34,3 +34,10 @@ def available() -> list[str]:
 
 
 from cqa.evaluators import baseline, llm_judge  # noqa: E402,F401  (registers built-ins)
+
+
+def _register_chain() -> None:
+    import cqa.engines  # noqa: F401  (registers "chain"; imported late to avoid a cycle)
+
+
+_register_chain()
