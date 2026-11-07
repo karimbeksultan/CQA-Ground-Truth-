@@ -33,7 +33,9 @@ from the organizers in place of `<GROUP>`:
 .venv\Scripts\python -m cqa check-results results/prod/results.json --group <GROUP>
 ```
 
-then `git add results/prod/results.json`, commit and **push** (a local commit does not count).
+then `git add results/prod/results.json`, commit and **push to `main`** (`git push origin HEAD:main`; a local commit does not count, and the jury reads `main`).
+
+Control-hour rules: if the organizers send the set as a file, use `fetch --group <GROUP> --file <path>` instead of the API. `export --set prod` refuses a group that does not hold exactly 10 dialogs (a wrong group id); `--force` writes it anyway. **Hard stop at minute 40:** if a dialog is still running, press Ctrl+C — finished dialogs are already on disk — then `rerun` once and export; anything still unfinished is written as `status: error`, never as a zero. Do not run anything else on the same API key that day.
 `rerun` re-evaluates only failed dialogs; anything still failing is written with `status: "error"` and
 the reason, never as a zero. The team name comes from `CQA_TEAM_NAME` in `.env` (or `--team`).
 
