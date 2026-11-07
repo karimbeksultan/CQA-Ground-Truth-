@@ -108,6 +108,12 @@
     9 s), fetch → run (2 dialogs, 162 s) → rerun → export → check-results — no manual step; 10 chats
     ≈ 7–9 min at 3 workers.
 
+- **Third pass (2026-11-08):** 7-role panel 7.5/6/7/7/6/7/7. Fixed: c06 no longer double-penalises what c05/c08
+  count, insults are gross errors, c04=15 example; tolerant parsing, empty groups not cached, rerun saves as
+  it goes; default checklists read-only (live swap always saves as new); quieter UI and own leaf-check logo.
+  Full DEV run (chat v4 / call v5): **94.7% / MAE 3.08, chats 95.7% / 2.20, gross errors 8/8, 0 false alarms**,
+  no empty evidence. Blind independent labeling of 20 chats agrees with our gold on 91.9% (c02 is the gap).
+
 ## Next
 1. Control hour (T+23): fetch the new group → `run --evaluator chain --engines cloud` → `rerun` → `export --set prod`
    → `check-results --group` → commit and push `results/prod/results.json` → only then the live criterion swap
