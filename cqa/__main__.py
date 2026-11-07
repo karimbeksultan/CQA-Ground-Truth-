@@ -82,6 +82,14 @@ def cmd_run(a: argparse.Namespace) -> None:
         print(f"  report: {out / 'report.md'}")
 
 
+def cmd_rerun(a: argparse.Namespace) -> None:
+    res = runner.rerun_failed(Path(a.run), workers=a.workers)
+    meta = json.loads((Path(a.run) / "run.json").read_text(encoding="utf-8"))
+    print(f"retried {res['retried']}, fixed {res['fixed']}; now {meta['n_ok']}/{meta['n_selected']} evaluated")
+    for cid, err in meta["errors"].items():
+        print(f"  ERROR {cid}: {err}")
+
+
 def cmd_compare(a: argparse.Namespace) -> None:
     run_dir = Path(a.run)
     group = a.group or json.loads((run_dir / "run.json").read_text(encoding="utf-8"))["group_id"]
@@ -121,6 +129,9 @@ def main(argv: list[str] | None = None) -> None:
                    help="OpenAI-compatible engines: don't request response_format=json_object")
     r.add_argument("--workers", type=int, default=4)
     r.set_defaults(fn=cmd_run)
+    rr = sub.add_parser("rerun", help="re-evaluate only the failed conversations of a run")
+    rr.add_argument("--run", required=True); rr.add_argument("--workers", type=int, default=4)
+    rr.set_defaults(fn=cmd_rerun)
     c = sub.add_parser("compare"); c.add_argument("--run", required=True); c.add_argument("--group")
     c.set_defaults(fn=cmd_compare)
     sub.add_parser("checklists").set_defaults(fn=cmd_checklists)

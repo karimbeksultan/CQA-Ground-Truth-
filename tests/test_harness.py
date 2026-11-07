@@ -157,6 +157,35 @@ def test_import_labels_validates_whole_batch_before_writing(tmp_path, convs):
     assert label.split == ground_truth.assign_splits(convs)["t-ru-001"]
 
 
+def test_rerun_retries_only_failed_with_same_settings(tmp_path, convs):
+    calls: list[str] = []
+
+    @evaluators.register("flaky")
+    class Flaky:
+        name = "flaky"
+
+        def __init__(self, model=None):
+            self.model = model
+
+        def evaluate(self, conv, checklist):
+            calls.append(conv.conversation_id)
+            if conv.conversation_id == "t-ru-001" and calls.count("t-ru-001") == 1:
+                raise RuntimeError("HTTP 503 busy")
+            return evaluators.create("optimistic").evaluate(conv, checklist).model_copy(
+                update={"evaluator": "flaky", "model": self.model})
+
+    out = runner.run("TEST", "flaky", convs=convs, gold_path=tmp_path / "none.jsonl", runs_dir=tmp_path / "runs",
+                     run_id="r6", workers=1, evaluator_kwargs={"model": "m-9"})
+    assert json.loads((out / "run.json").read_text(encoding="utf-8"))["n_ok"] == 1
+    res = runner.rerun_failed(out, workers=1, convs=convs, gold_path=tmp_path / "none.jsonl")
+    meta = json.loads((out / "run.json").read_text(encoding="utf-8"))
+    assert res == {"retried": 1, "fixed": 1} and meta["n_ok"] == 2 and meta["errors"] == {}
+    assert calls == ["t-ru-001", "t-ru-call-001", "t-ru-001"]  # the successful one was not re-evaluated
+    preds = runner.load_predictions(out)
+    assert [p["conversation_id"] for p in preds] == ["t-ru-001", "t-ru-call-001"]
+    assert preds[0]["evaluation"]["model"] == "m-9" and len(meta["reruns"]) == 1
+
+
 def test_split_requires_gold(convs, tmp_path):
     with pytest.raises(ValueError):
         runner.run("TEST", "optimistic", convs=convs, split="dev", gold_path=tmp_path / "none.jsonl",

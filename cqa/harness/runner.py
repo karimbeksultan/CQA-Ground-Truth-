@@ -108,7 +108,8 @@ def run(group_id: str, evaluator_name: str, *, checklist_override: str | None = 
 
     meta = {
         "run_id": run_id, "group_id": group_id, "evaluator": evaluator_name,
-        "model": getattr(evaluator, "model", None), "split": split, "git_commit": _git_commit(),
+        "model": getattr(evaluator, "model", None), "evaluator_kwargs": evaluator_kwargs or {},
+        "split": split, "git_commit": _git_commit(),
         "checklists": {cl.id: checklists.fingerprint(cl) for _, cl in plan},
         "started_at": started.isoformat(), "duration_s": round(time.perf_counter() - t0, 2),
         "n_selected": len(selected), "n_ok": sum(r["error"] is None for r in records),
@@ -122,6 +123,47 @@ def run(group_id: str, evaluator_name: str, *, checklist_override: str | None = 
     if gold:
         score_run(out, gold)
     return out
+
+
+def rerun_failed(run_dir: Path, *, workers: int = 4, convs: list[Conversation] | None = None,
+                 gold_path: Path | None = None) -> dict:
+    """Re-evaluate only the conversations that failed in a run, with the same evaluator, model and
+    checklists, and write them back into the same run. Refuses if a checklist changed since the run."""
+    meta = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    records = load_predictions(run_dir)
+    failed = [r for r in records if r["error"]]
+    if not failed:
+        return {"retried": 0, "fixed": 0}
+    kwargs = meta.get("evaluator_kwargs") or ({"model": meta["model"]} if meta.get("model") else {})
+    evaluator = evaluators.create(meta["evaluator"], **kwargs)
+    by_id = {c.conversation_id: c for c in (convs if convs is not None else data_source.load(meta["group_id"]))}
+    plan = []
+    for r in failed:
+        cl = checklists.load(r["checklist_id"])
+        if checklists.fingerprint(cl) != r["checklist_fingerprint"]:
+            raise ValueError(f"checklist {cl.id} changed since the run; start a new run instead")
+        plan.append((by_id[r["conversation_id"]], cl))
+
+    abort = threading.Event()
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        redone = {rec["conversation_id"]: rec
+                  for rec in pool.map(lambda job: _evaluate_one(evaluator, *job, abort=abort), plan)}
+    records = [redone.get(r["conversation_id"], r) for r in records]
+    with (run_dir / "predictions.jsonl").open("w", encoding="utf-8") as f:
+        for rec in records:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    fixed = sum(1 for r in redone.values() if r["error"] is None)
+    meta["errors"] = {r["conversation_id"]: r["error"] for r in records if r["error"]}
+    meta["n_ok"] = sum(r["error"] is None for r in records)
+    meta["aborted"] = abort.is_set()
+    meta.setdefault("reruns", []).append({"at": datetime.now(timezone.utc).isoformat(),
+                                          "retried": len(failed), "fixed": fixed, "git_commit": _git_commit()})
+    (run_dir / "run.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    gold_path = gold_path or ground_truth.golden_path(meta["group_id"])
+    if gold_path.exists():
+        score_run(run_dir, ground_truth.load(gold_path))
+    return {"retried": len(failed), "fixed": fixed}
 
 
 def load_predictions(run_dir: Path) -> list[dict]:
