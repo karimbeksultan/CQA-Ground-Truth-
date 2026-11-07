@@ -91,7 +91,7 @@ def _hold_state(text: str, current: bool) -> bool:
 
 def render_transcript(conv: Conversation) -> str:
     if conv.channel != "voice call":
-        lines = [f"[{t.index}] {t.timestamp} {SPEAKER[t.speaker]}: {_one_line(t.text)}" for t in conv.transcript]
+        lines = [f"[{t.index + 1}] {t.timestamp} {SPEAKER[t.speaker]}: {_one_line(t.text)}" for t in conv.transcript]
         return "<transcript>\n" + "\n".join(lines) + "\n</transcript>"
     stamps = [_parse_ts(t.timestamp) for t in conv.transcript]
     start = next((s for s in stamps if s is not None), None)
@@ -108,7 +108,7 @@ def render_transcript(conv: Conversation) -> str:
         who = SPEAKER[t.speaker]
         if t.speaker == "operator" and on_hold:
             who += " (на удержании, клиент не слышит)"
-        lines.append(f"[{t.index}] {when}{pause} {who}: {_one_line(t.text)}")
+        lines.append(f"[{t.index + 1}] {when}{pause} {who}: {_one_line(t.text)}")
         if t.speaker == "system":
             on_hold = _hold_state(t.text, on_hold)
     return "<transcript>\n" + "\n".join(lines) + "\n</transcript>"
@@ -118,13 +118,13 @@ def user_prompt(conv: Conversation, checklist: Checklist) -> str:
     # Order matters for long calls: dialog first, then the rules and the task right before the answer,
     # so the criteria are not lost behind a 100-turn transcript.
     ids = ", ".join(c.id for c in checklist.criteria)
-    first_op = next((t.index for t in conv.transcript if t.speaker == "operator"), None)
+    first_op = next((t.index + 1 for t in conv.transcript if t.speaker == "operator"), None)
     first_line = (f"Первая реплика оператора: [{first_op}]." if first_op is not None
                   else "Оператор в диалоге не отвечал.")
     return (
         f"## Диалог {conv.conversation_id}\n"
         f"Канал: {CHANNEL.get(conv.channel, conv.channel)}. Язык клиента: {LANGUAGE.get(conv.language, conv.language)}. "
-        f"Реплик: {len(conv.transcript)} (номера 0–{len(conv.transcript) - 1}). {first_line}\n"
+        f"Реплик: {len(conv.transcript)} (номера 1–{len(conv.transcript)}). {first_line}\n"
         + (f"{CALL_NOTE}\n" if conv.channel == "voice call" else "") + "\n"
         f"{render_transcript(conv)}\n\n"
         f"{render_checklist(checklist)}\n\n"

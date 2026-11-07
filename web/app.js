@@ -379,7 +379,7 @@ function transcriptPane(conv) {
       ? `${String(Math.floor(tu.audio_offset / 60)).padStart(2, "0")}:${String(Math.floor(tu.audio_offset % 60)).padStart(2, "0")}`
       : isCall ? "" : tu.timestamp;
     return h("div", { class: `turn ${tu.speaker} ${holds[i] ? "hold" : ""}`, id: `turn-${tu.index}`, "data-hold": holds[i] ? t("turn.hold") : false },
-      h("div", { class: "idx" }, tu.index),
+      h("div", { class: "idx" }, tu.index + 1),
       h("div", {},
         h("div", { class: "who" }, t(`speaker.${tu.speaker}`), time ? h("time", {}, time) : null,
           audio && tu.audio_offset != null ? h("button", { class: "seek", type: "button", title: t("turn.play"), "aria-label": t("turn.play"), icon: "play",
@@ -481,9 +481,9 @@ function criterionRow(ev, crit, pane, appeals, rerender) {
     res?.explanation ? h("p", { class: "expl" }, res.explanation) : null,
     (res?.evidence?.length || res?.checked_range) ? h("div", { class: "evidence" },
       h("span", { class: "muted", style: "font-size:.8rem" }, t("card.evidence")),
-      (res.evidence || []).map((i) => h("button", { type: "button", class: "ev", onclick: () => { pane.focusTurns([i], null, true); focusCrit(crit.id); } }, `#${i}`)),
+      (res.evidence || []).map((i) => h("button", { type: "button", class: "ev", onclick: () => { pane.focusTurns([i], null, true); focusCrit(crit.id); } }, `#${i + 1}`)),
       res.checked_range ? h("button", { type: "button", class: "ev range", title: t("card.checked"),
-        onclick: () => { pane.focusTurns([], res.checked_range, false); focusCrit(crit.id); } }, `${t("card.checked")} #${res.checked_range[0]}–${res.checked_range[1]}`) : null) : null,
+        onclick: () => { pane.focusTurns([], res.checked_range, false); focusCrit(crit.id); } }, `${t("card.checked")} #${res.checked_range[0] + 1}–${res.checked_range[1] + 1}`) : null) : null,
     mine.filter((a) => a.status === "resolved").map((a) => h("div", { class: "decision-line" },
       h("b", {}, a.decision === "change"
         ? t("card.decisionChange", { a: fmt(a.total_before), b: fmt(a.total_after) })
@@ -592,7 +592,7 @@ async function appealsView(tab) {
     const crit = ev.checklist.criteria.find((c) => c.id === a.criterion_id);
     const fragment = h("div", { class: "fragment" }, (a.fragment || []).map((tu) =>
       h("div", { class: `turn ${tu.speaker} ${a.disputed.evidence.includes(tu.index) ? "lit" : ""}` },
-        h("div", { class: "idx" }, tu.index),
+        h("div", { class: "idx" }, tu.index + 1),
         h("div", {}, h("div", { class: "who" }, t(`speaker.${tu.speaker}`)), h("div", { class: "txt" }, tu.text)))));
     const left = h("div", { class: "left" },
       h("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" },

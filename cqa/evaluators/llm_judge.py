@@ -45,12 +45,13 @@ def validate(data: dict, conv: Conversation, checklist: Checklist) -> tuple[list
     seen: dict[str, CriterionResult] = {}
 
     def turn_ids(value: object) -> list[int] | None:
-        """Strict: a list of real ints inside the dialog (no "3", 3.0 or True)."""
+        """Strict: a list of real ints inside the dialog (no "3", 3.0 or True). The model sees turns
+        numbered from 1 (as the organizers count them); internally turns are 0-based array positions."""
         if value is None:
             return []
-        if not isinstance(value, list) or not all(type(i) is int and 0 <= i < n_turns for i in value):
+        if not isinstance(value, list) or not all(type(i) is int and 1 <= i <= n_turns for i in value):
             return None
-        return value
+        return [i - 1 for i in value]
 
     for item in items:
         if not isinstance(item, dict):
@@ -75,7 +76,7 @@ def validate(data: dict, conv: Conversation, checklist: Checklist) -> tuple[list
             continue
         evidence, rng = turn_ids(item.get("evidence")), turn_ids(item.get("checked_range"))
         if evidence is None or rng is None or (rng and (len(rng) != 2 or rng[0] > rng[1])):
-            errors.append(f"{cid}: evidence — список номеров реплик 0–{n_turns - 1}, "
+            errors.append(f"{cid}: evidence — список номеров реплик 1–{n_turns}, "
                           "checked_range — [начало, конец] с началом не больше конца")
             continue
         if answer != "na" and not evidence and not rng:
