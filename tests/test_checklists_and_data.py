@@ -22,7 +22,7 @@ def test_save_roundtrip_and_fingerprint(tmp_path):
     again = checklists.load(cl.id, tmp_path)
     assert again == cl
     assert checklists.fingerprint(again) == checklists.fingerprint(cl)
-    changed = cl.model_copy(update={"version": 2})
+    changed = cl.model_copy(update={"version": cl.version + 1})
     assert checklists.fingerprint(changed) != checklists.fingerprint(cl)
 
 

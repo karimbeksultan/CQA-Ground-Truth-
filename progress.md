@@ -36,6 +36,13 @@
   covered: gemma 82.9% / MAE 7.74 vs gemini 84.3% / 10.25 — on par. Weak spots for both: c07
   (bare farewell → "yes") and c06 (missed 4/7 steps). Gemma becomes the tuning engine.
 - OpenAI-compatible client (Groq, Cerebras, OpenRouter, Mistral, Ollama, FreeLLMAPI) committed after review.
+- Checklists v2: the four team-confirmed rules + clarifications for every criterion appended to
+  `guidance` (organizers' text untouched). Gemma on dev: **94.9% agreement, MAE 2.21** (v1: 86.3% / 7.10),
+  ±5 in 76%, gross-error recall 100%, c07 96%. Calls still weakest (78.6%, 2 dialogs).
+  One dialog failed: gemma returned 503 "high demand" on all 6 attempts — need a retry/fallback path.
+- Local engine proven: `ollama` + qwen3:1.7b on CPU evaluated p1-ru-001 end to end (valid JSON first
+  call, 2.5k in / 1.2k out tokens) but took 605 s and graded leniently (total 100 vs gold 92.31) —
+  fine to demo "works offline", not usable as the primary engine on this laptop.
 
 ## Next
 1. User reviews flagged gold labels (grouped by rule in docs/LABELING.md) → status `reviewed`.
