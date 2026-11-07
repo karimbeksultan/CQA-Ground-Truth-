@@ -169,6 +169,21 @@ const S = {
   "cl.stepEmpty": ["{id}: у ступени шкалы не указаны баллы", "{id}: a scale step has no points", "{id}: шкала сатысында ұпай көрсетілмеген"],
   "cl.apply": ["Оценить диалоги этим чек-листом", "Evaluate dialogs with this checklist", "Диалогтарды осы чек-парақпен бағалау"],
 
+  "dialogs.show": ["Набор", "Set", "Жиын"],
+  "dialogs.allGroups": ["Все наборы", "All sets", "Барлық жиындар"],
+  "dialogs.results": ["results.json", "results.json", "results.json"],
+  "dialogs.resultsHint": ["Скачать результаты набора в формате организаторов (последняя оценка каждого диалога)", "Download the set's results in the organizers' format (latest evaluation of each dialog)", "Жиын нәтижелерін ұйымдастырушылар форматында жүктеу (әр диалогтың соңғы бағасы)"],
+  "engine.pick": ["Модель", "Model", "Модель"],
+  "engine.auto": ["Авто: цепочка облачных моделей", "Auto: cloud model chain", "Авто: бұлттық модельдер тізбегі"],
+  "engine.local": ["Локально: Ollama qwen3 (медленно)", "Local: Ollama qwen3 (slow)", "Жергілікті: Ollama qwen3 (баяу)"],
+  "card.prev": ["Предыдущая оценка", "Previous evaluation", "Алдыңғы бағалау"],
+  "card.was": ["было", "was", "бұрын"],
+  "card.newCrit": ["новый критерий", "new criterion", "жаңа критерий"],
+  "card.changedCrit": ["критерий изменён", "criterion changed", "критерий өзгертілді"],
+  "cl.applied": ["Чек-лист сохранён и выбран: отметьте диалоги и нажмите «Оценить»", "Checklist saved and selected: tick dialogs and press Evaluate", "Чек-парақ сақталды және таңдалды: диалогтарды белгілеп, «Бағалау» батырмасын басыңыз"],
+  "cl.removeConfirm": ["Удалить критерий {id}?", "Remove criterion {id}?", "{id} критерийін жою керек пе?"],
+  "view.big": ["Крупный текст (проектор)", "Large text (projector)", "Ірі мәтін (проектор)"],
+
   "err.network": ["Сервер не отвечает. Проверьте, что запущен uvicorn.", "The server is not responding. Check that uvicorn is running.", "Сервер жауап бермейді. uvicorn іске қосылғанын тексеріңіз."],
   "err.prefix": ["Ошибка", "Error", "Қате"],
 };

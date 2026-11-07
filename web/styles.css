@@ -360,3 +360,11 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .93rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* projector mode: bigger type, secondary text lifted to the readable tone */
+html.big { font-size: 18px; --text-3: var(--text-2); }
+.big-toggle { width: 100%; justify-content: center; }
+.big-toggle[aria-pressed="true"] { border-color: var(--fr-green); color: var(--text); }
+/* before/after: what a changed checklist or a re-run changed */
+.status-pill.new { margin-left: 8px; background: rgba(0, 198, 132, .16); color: #06fca8; border: 1px solid rgba(6, 252, 168, .35); }
+.was-answer { margin-left: 8px; font-size: .78rem; color: var(--text-2); text-decoration: line-through; text-decoration-color: rgba(255,255,255,.35); }

@@ -61,7 +61,7 @@ async function api(path, opts = {}) {
 }
 
 function toast(msg, kind = "") {
-  const el = h("div", { class: `toast ${kind}` }, msg);
+  const el = h("div", { class: `toast ${kind}`, role: kind === "error" ? "alert" : false }, msg);
   document.getElementById("toasts").append(el);
   setTimeout(() => el.remove(), kind === "error" ? 7000 : 4000);
 }
@@ -98,7 +98,8 @@ const state = {
   engine: "",
   openAppeals: 0,
   selected: new Set(),
-  filters: { q: "", channel: "", language: "" },
+  filters: { q: "", channel: "", language: "", group: store.get("group", "") },
+  engineOptions: [],
   sort: { key: "conversation_id", dir: 1 },
   checklistChoice: "",
   evalCache: new Map(),
@@ -126,6 +127,8 @@ function renderRail() {
       h("div", {}, h("label", { id: "lbl-lang" }, t("lang.label")),
         seg(LANGS.map((l) => [l, LANG_LABEL[l]]), getLang(),
           (v) => { setLang(v); store.set("lang", v); renderRail(); route(); }, "lbl-lang")),
+      h("button", { type: "button", class: "btn ghost sm big-toggle", "aria-pressed": String(document.documentElement.classList.contains("big")),
+        onclick: () => { const on = document.documentElement.classList.toggle("big"); store.set("big", on ? "1" : ""); renderRail(); } }, t("view.big")),
       state.engine ? h("div", { class: "engine-note" }, t("engine.label", { m: state.engine })) : null),
   );
 }
@@ -171,8 +174,8 @@ function jobStrip() {
   }));
 }
 
-async function startJob(ids, checklistId) {
-  const body = { conversation_ids: ids, ...(checklistId ? { checklist_id: checklistId } : {}) };
+async function startJob(ids, checklistId, engine) {
+  const body = { conversation_ids: ids, ...(checklistId ? { checklist_id: checklistId } : {}), ...(engine ? { engines: [engine] } : {}) };
   const job = await api("/api/evaluations", { method: "POST", body: JSON.stringify(body) });
   state.jobs.push(job);
   toast(t("toast.jobStarted", { n: ids.length }), "ok");
@@ -193,6 +196,7 @@ let dialogsRefs = null;
 function filteredRows() {
   const f = state.filters;
   return state.conversations
+    .filter((c) => !f.group || c.group_id === f.group)
     .filter((c) => !f.q || c.conversation_id.toLowerCase().includes(f.q.toLowerCase()))
     .filter((c) => !f.channel || c.channel === f.channel)
     .filter((c) => !f.language || c.language === f.language)
@@ -204,9 +208,11 @@ function filteredRows() {
     });
 }
 
-function selectedCount() {
-  return [...state.selected].filter((id) => state.conversations.some((c) => c.conversation_id === id)).length;
+function selectedIds() {
+  const f = state.filters;
+  return [...state.selected].filter((id) => state.conversations.some((c) => c.conversation_id === id && (!f.group || c.group_id === f.group)));
 }
+function selectedCount() { return selectedIds().length; }
 
 function updateEvalButton() {
   if (!dialogsRefs) return;
@@ -314,8 +320,10 @@ function dialogsView() {
     try {
       const res = await api(`/api/datasets/${encodeURIComponent(g)}/import`, { method: "POST" });
       store.set("group", g);
+      state.filters.group = g; // show the set just imported, not everything ever loaded
       toast(t("toast.imported", { n: res.imported }), "ok");
-      await refreshConversations(); refreshTable();
+      await refreshConversations(); route();
+      return;
     } catch (err) { toast(`${t("err.prefix")}: ${err.message}`, "error"); }
     btn.disabled = false;
   };
@@ -323,7 +331,7 @@ function dialogsView() {
   const evalBtn = h("button", { class: "btn primary", type: "button", icon: "run",
     onclick: async (e) => {
       e.currentTarget.disabled = true;
-      try { await startJob([...state.selected], state.checklistChoice); state.selected.clear(); refreshTable(); }
+      try { await startJob(selectedIds(), state.checklistChoice); state.selected.clear(); refreshTable(); }
       catch (err) { toast(`${t("err.prefix")}: ${err.message}`, "error"); }
       updateEvalButton();
     } }, evalLabel);
@@ -332,6 +340,17 @@ function dialogsView() {
   dialogsRefs = { evalBtn, evalLabel, jobsHost, tableHost };
   updateEvalButton();
   const field = (label, control, cls = "") => h("label", { class: `field ${cls}` }, h("span", {}, label), control);
+  const groups = [...new Set(state.conversations.map((c) => c.group_id).filter(Boolean))].sort();
+  if (f.group && !groups.includes(f.group)) f.group = "";
+  const resultsHref = () => `${API}/api/results?group_id=${encodeURIComponent(f.group)}&download=true`;
+  const resultsLink = h("a", { class: "btn", icon: "download", href: f.group ? resultsHref() : "#", download: `results-${f.group}.json`,
+    hidden: !f.group, title: t("dialogs.resultsHint") }, t("dialogs.results"));
+  const groupSelect = h("select", { class: "input", onchange: (e) => {
+    f.group = e.target.value;
+    resultsLink.hidden = !f.group;
+    if (f.group) { resultsLink.href = resultsHref(); resultsLink.setAttribute("download", `results-${f.group}.json`); }
+    refreshTable(); updateEvalButton();
+  } }, h("option", { value: "" }, t("dialogs.allGroups")), groups.map((g) => h("option", { value: g, selected: g === f.group }, g)));
 
   return [
     h("div", { class: "topbar" }, h("div", {}, h("h1", {}, t("dialogs.title")), h("div", { class: "sub" }, t("dialogs.sub")))),
@@ -340,6 +359,7 @@ function dialogsView() {
       h("button", { class: "btn", type: "button", icon: "download", onclick: (e) => doImport(e.currentTarget) }, t("dialogs.import")),
       h("button", { class: "btn", type: "button", icon: "upload", onclick: () => fileInput.click() }, t("dialogs.upload")), fileInput,
       h("div", { class: "sep" }),
+      field(t("dialogs.show"), groupSelect),
       field(t("dialogs.search"), h("input", { class: "input", type: "search", value: f.q, placeholder: "p1-ru-001",
         oninput: (e) => { f.q = e.target.value; refreshTable(); } }), "grow"),
       field(t("dialogs.channel"), h("select", { class: "input", onchange: (e) => { f.channel = e.target.value; refreshTable(); } },
@@ -350,7 +370,7 @@ function dialogsView() {
       field(t("dialogs.checklist"), h("select", { class: "input", onchange: (e) => { state.checklistChoice = e.target.value; } },
         h("option", { value: "" }, t("dialogs.auto")),
         state.checklists.map((c) => h("option", { value: c.id, selected: c.id === state.checklistChoice }, `${c.name} · v${c.version}`)))),
-      evalBtn),
+      evalBtn, resultsLink),
     jobsHost,
     tableHost,
   ];
@@ -447,8 +467,15 @@ function ribbon(checklist, from, to, onPick) {
   return wrap;
 }
 
-function criterionRow(ev, crit, pane, appeals, rerender) {
+function critChanged(a, b) {
+  const keys = ["name", "type", "weight", "na_allowed", "description", "na_rule", "guidance"];
+  return keys.some((k) => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null)) || JSON.stringify(a.scale ?? null) !== JSON.stringify(b.scale ?? null);
+}
+
+function criterionRow(ev, crit, pane, appeals, rerender, prev) {
   const res = ev.evaluation.results.find((r) => r.criterion_id === crit.id);
+  const prevCrit = prev?.checklist?.criteria.find((x) => x.id === crit.id);
+  const prevAns = prev?.evaluation?.results.find((r) => r.criterion_id === crit.id)?.answer;
   const original = ev.evaluation.results.find((r) => r.criterion_id === crit.id)?.answer;
   const finalAnswer = ev.final_answers[crit.id];
   const sc = ev.final_score.criteria.find((x) => x.criterion_id === crit.id);
@@ -474,7 +501,10 @@ function criterionRow(ev, crit, pane, appeals, rerender) {
   return h("article", { class: "crit", id: `crit-${crit.id}` },
     h("div", { class: "crit-top" },
       h("div", { class: "crit-name" }, `${crit.id} · ${crit.name}`,
-        h("small", {}, crit.type === "flag" ? t("type.flag") : t("card.weight", { w: crit.weight }))),
+        h("small", {}, crit.type === "flag" ? t("type.flag") : t("card.weight", { w: crit.weight }),
+          prev && !prevCrit ? h("span", { class: "status-pill new" }, t("card.newCrit")) : null,
+          prevCrit && critChanged(prevCrit, crit) ? h("span", { class: "status-pill new" }, t("card.changedCrit")) : null,
+          prevAns !== undefined && prevAns !== original ? h("span", { class: "was-answer" }, `${t("card.was")}: ${answerLabel(prevAns, prevCrit || crit)}`) : null)),
       original !== finalAnswer ? h("span", { class: `ans ${answerClass(original, crit)}`, style: "opacity:.45;text-decoration:line-through" }, answerLabel(original, crit)) : null,
       h("span", { class: `ans ${answerClass(finalAnswer, crit)}` }, answerLabel(finalAnswer, crit)),
       pts),
@@ -507,6 +537,10 @@ async function cardView(convId, evalId) {
   const evals = conv.evaluations || [];
   const chosen = evalId || evals.at(-1)?.id;
   const ev = chosen ? await api(`/api/evaluations/${chosen}`) : null;
+  // the evaluation before the chosen one: shows what a changed checklist or a re-run actually changed
+  const chosenIdx = evals.findIndex((e) => e.id === chosen);
+  const prevMeta = chosenIdx > 0 ? evals.slice(0, chosenIdx).reverse().find((e) => e.status === "done") : null;
+  const prev = prevMeta && ev?.status === "done" ? await api(`/api/evaluations/${prevMeta.id}`).catch(() => null) : null;
   const pane = transcriptPane(conv);
   const rerender = () => route();
   const runningJob = state.jobs.find((j) => (j.status === "running" || j.status === "queued") && j.conversation_ids.includes(convId)
@@ -514,10 +548,13 @@ async function cardView(convId, evalId) {
   const checklistSelect = h("select", { class: "input", "aria-label": t("dialogs.checklist"), style: "max-width:240px" },
     h("option", { value: "" }, t("dialogs.auto")),
     state.checklists.map((c) => h("option", { value: c.id, selected: ev && c.id === ev.checklist_id }, `${c.name} · v${c.version}`)));
+  const engineSelect = state.engineOptions.length > 1 ? h("select", { class: "input", "aria-label": t("engine.pick"), style: "max-width:220px" },
+    state.engineOptions.map(([v, l]) => h("option", { value: v, selected: v === (state.engineChoice || "") }, l))) : null;
   const evalButton = state.role === "analyst" ? h("button", { class: "btn primary sm", type: "button", icon: "run", disabled: Boolean(runningJob),
     onclick: async (e) => {
       e.currentTarget.disabled = true;
-      try { await startJob([convId], checklistSelect.value); route(); } catch (err) { toast(`${t("err.prefix")}: ${err.message}`, "error"); e.currentTarget.disabled = false; }
+      state.engineChoice = engineSelect?.value || "";
+      try { await startJob([convId], checklistSelect.value, state.engineChoice); route(); } catch (err) { toast(`${t("err.prefix")}: ${err.message}`, "error"); e.currentTarget.disabled = false; }
     } }, ev ? t("card.reevaluate") : t("card.evaluate")) : null;
 
   const head = h("div", { class: "pane-head" },
@@ -526,7 +563,8 @@ async function cardView(convId, evalId) {
       onchange: (e) => navigate(`#/c/${encodeURIComponent(convId)}/${e.target.value}`) },
       evals.map((e, i) => h("option", { value: e.id, selected: e.id === chosen },
         `${t("card.version")} ${i + 1} · ${e.checklist_id} v${e.checklist_version ?? "?"} · ${e.status === "done" ? fmt(e.total) : t("status.failed")}`))) : null,
-    h("div", { style: "margin-left:auto;display:flex;gap:8px;align-items:center" }, state.role === "analyst" ? checklistSelect : null, evalButton));
+    h("div", { style: "margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, state.role === "analyst" ? checklistSelect : null,
+      state.role === "analyst" ? engineSelect : null, evalButton));
 
   const body = [];
   if (runningJob) {
@@ -547,6 +585,8 @@ async function cardView(convId, evalId) {
         h("div", { class: "total-meta" },
           fin == null ? h("div", { class: "row" }, t("card.noTotal")) : null,
           orig !== fin ? h("div", { class: "row" }, t("card.originalWas"), h("span", { class: "was" }, fmt(orig))) : null,
+          prev ? h("div", { class: "row" }, h("span", { class: "muted" }, t("card.prev")),
+            `${fmt(prev.score.total)} → ${fmt(orig)}`, h("span", { class: "muted" }, `${prev.checklist.name} · v${prev.checklist_version}`)) : null,
           h("div", { class: "row" }, h("span", { class: "muted" }, t("card.checklist")), `${checklist.name} · v${ev.checklist_version}`),
           h("div", { class: "row" }, h("span", { class: "muted" }, t("card.engine")), ev.model || ev.engine || "—",
             usage.fallback_from ? h("span", { class: "status-pill open" }, t("card.fallback")) : null),
@@ -558,7 +598,7 @@ async function cardView(convId, evalId) {
         ev.final_score.sections.map((s) => h("span", { class: "section-chip" },
           checklist.sections.find((x) => x.id === s.section_id)?.name || s.section_id,
           h("b", {}, `${fmt(s.points)} / ${fmt(s.max_points)}`)))) : null,
-      h("div", { class: "criteria" }, checklist.criteria.map((c) => criterionRow(ev, c, pane, appeals, rerender))),
+      h("div", { class: "criteria" }, checklist.criteria.map((c) => criterionRow(ev, c, pane, appeals, rerender, prev))),
       state.role === "reviewer" ? h("div", { class: "tech" }, t("card.reviewerHint")) : null,
       h("details", { class: "tech" }, h("summary", {}, t("card.tech")),
         h("pre", {}, JSON.stringify({ engine: ev.engine, model: ev.model, usage, checklist_fingerprint: ev.checklist_fingerprint }, null, 2)),
@@ -674,10 +714,10 @@ function checklistsView(id) {
   let weightNote = draft ? weights() : null;
   const errorBox = h("div", { class: "notice error", hidden: true });
 
-  const save = async (asNew) => {
+  const save = async (asNew, stay = false) => {
     errorBox.hidden = true;
     const badStep = draft.criteria.find((c) => c.type === "scale" && (c.scale || []).some((s) => String(s.value).trim() === ""));
-    if (badStep) { errorBox.textContent = t("cl.stepEmpty", { id: badStep.id }); errorBox.hidden = false; return; }
+    if (badStep) { errorBox.textContent = t("cl.stepEmpty", { id: badStep.id }); errorBox.hidden = false; return null; }
     const body = structuredClone(draft);
     for (const c of body.criteria) {
       c.weight = Number(c.weight) || 0;
@@ -699,8 +739,9 @@ function checklistsView(id) {
       toast(t("toast.saved", { v: saved.version }), "ok");
       state.checklists = await api("/api/checklists");
       draft = null; draftDirty = false;
-      navigate(`#/checklists/${encodeURIComponent(saved.id)}`);
-    } catch (err) { errorBox.textContent = err.message; errorBox.hidden = false; errorBox.scrollIntoView({ block: "center" }); }
+      if (!stay) navigate(`#/checklists/${encodeURIComponent(saved.id)}`);
+      return saved;
+    } catch (err) { errorBox.textContent = err.message; errorBox.hidden = false; errorBox.scrollIntoView({ block: "center" }); return null; }
   };
   const newIdInput = h("input", { class: "input", placeholder: "chat_control_v1", "aria-label": t("cl.newId"), style: "width:220px" });
 
@@ -718,7 +759,10 @@ function checklistsView(id) {
       h("input", { class: "input", value: c.na_rule || "", oninput: bind("na_rule") }));
     return h("div", { class: "crit-edit" },
       h("div", { class: "crit-edit-head" }, h("b", {}, c.id || "—"), h("span", { style: "flex:1" }, c.name),
-        h("button", { class: "btn ghost sm danger", type: "button", onclick: () => { draft.criteria.splice(i, 1); mark(); route(); } }, t("cl.remove"))),
+        h("button", { class: "btn ghost sm danger", type: "button", onclick: () => {
+          if (!window.confirm(t("cl.removeConfirm", { id: c.id || "—" }))) return;
+          draft.criteria.splice(i, 1); mark(); route();
+        } }, t("cl.remove"))),
       h("div", { class: "form-grid" },
         h("label", { class: "field span-2" }, h("span", {}, t("cl.critId")), h("input", { class: "input", value: c.id, oninput: bind("id") })),
         h("label", { class: "field span-3" }, h("span", {}, t("cl.critName")), h("input", { class: "input", value: c.name, oninput: bind("name") })),
@@ -770,7 +814,13 @@ function checklistsView(id) {
           mark(); route();
         } }, t("cl.add")),
         h("div", { class: "sticky-actions" },
-          h("button", { class: "btn", type: "button", onclick: () => { state.checklistChoice = draft.id; navigate("#/"); } }, t("cl.apply")),
+          h("button", { class: "btn", type: "button", onclick: async () => {
+            let id = draft.id;
+            if (draftDirty) { const saved = await save(false, true); if (!saved) return; id = saved.id; }
+            state.checklistChoice = id;
+            toast(t("cl.applied"), "ok");
+            navigate("#/");
+          } }, t("cl.apply")),
           newIdInput,
           h("button", { class: "btn", type: "button", onclick: () => save(true) }, t("cl.saveAs")),
           h("button", { class: "btn primary", type: "button", onclick: () => save(false) }, t("cl.save")))) : null),
@@ -812,6 +862,7 @@ async function route() {
 }
 
 async function boot() {
+  if (store.get("big", "")) document.documentElement.classList.add("big");
   renderRail();
   $main.replaceChildren(h("div", { style: "display:flex;flex-direction:column;gap:12px;max-width:700px" },
     [60, 90, 75, 85].map((w) => h("div", { class: "skeleton", style: `width:${w}%;height:18px` }))));
@@ -819,6 +870,8 @@ async function boot() {
     const [, checklists, engines] = await Promise.all([refreshConversations(), api("/api/checklists"), api("/api/engines").catch(() => null)]);
     state.checklists = checklists;
     state.engine = engines?.configured?.[0]?.split(":").slice(1).join(":") || "";
+    state.engineOptions = [["", t("engine.auto")], ...(engines?.configured || []).map((spec) => [spec, spec]),
+      ...((engines?.available || []).includes("ollama") ? [["ollama:qwen3:1.7b", t("engine.local")]] : [])];
   } catch (err) {
     $main.replaceChildren(h("div", { class: "notice error" }, err.message));
     return;

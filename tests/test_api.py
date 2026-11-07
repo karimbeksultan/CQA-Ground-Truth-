@@ -327,3 +327,19 @@ def test_audio_offsets_skip_paused_recording():
         {"index": 3, "timestamp": ts(35), "speaker": "operator", "text": "Здравствуйте"},
     ])
     assert audio_offsets(conv) == {0: 0.0, 1: 10.0, 2: 10.0, 3: 15.0}
+
+
+def test_results_endpoint_exports_the_latest_evaluation_of_every_dialog(env):
+    client, svc, state, _ = env
+    client.post("/api/datasets/TEST/import")
+    assert client.get("/api/results", params={"group_id": "TEST", "team": "T"}).json()["results"][0]["status"] == "error"
+    evaluate(client, ["t-ru-001"])
+    r = client.get("/api/results", params={"group_id": "TEST", "team": "T", "download": "true"})
+    assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+    doc = r.json()
+    by = {x["conversation_id"]: x for x in doc["results"]}
+    assert doc["schema_version"] == "1.0" and doc["team_name"] == "T"
+    assert by["t-ru-001"]["status"] == "ok" and len(by["t-ru-001"]["criteria"]) == 8
+    assert by["t-ru-call-001"] == {"conversation_id": "t-ru-call-001", "status": "error", "criteria": [],
+                                    "score": None, "error": "диалог не был оценён"}
+    assert client.get("/api/results", params={"group_id": "NOPE", "team": "T"}).status_code == 404

@@ -234,6 +234,25 @@ class Service:
                             "open_appeals": self._open_appeals(ev["id"])}})
         return out
 
+    def results(self, group_id: str, team_name: str) -> dict:
+        """The organizers' results.json (format 1.0) for a group: the latest evaluation of every dialog,
+        as the system produced it (appeal decisions are human corrections and are not exported)."""
+        from cqa.harness import export
+
+        docs = self.store.list("conversations", group_id=group_id)
+        if not docs:
+            raise NotFound(f"no dialogs imported for group {group_id!r}")
+        convs = [self.conversation(d["conversation_id"]) for d in docs]
+        latest = self._latest_evaluations()
+        preds = {}
+        for c in convs:
+            ev = latest.get(c.conversation_id)
+            if ev is None:
+                continue
+            preds[c.conversation_id] = {"evaluation": ev.get("evaluation"), "score": ev.get("score"),
+                                        "error": None if ev["status"] == "done" else (ev.get("error") or "оценка не удалась")}
+        return export.build_from_predictions(preds, convs, team_name, "chain")
+
     def _latest_evaluations(self) -> dict[str, dict]:
         latest: dict[str, dict] = {}
         for ev in self.store.list("evaluations"):

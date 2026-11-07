@@ -148,6 +148,18 @@ def create_app(service: Service | None = None) -> FastAPI:
         convs = svc.upload(payload)
         return {"imported": [c.conversation_id for c in convs]}
 
+    @app.get("/api/results")
+    def results(group_id: str, team: str | None = None, download: bool = False):
+        """results.json in the organizers' format for one group (same builder as `cqa export`)."""
+        if not re.fullmatch(SLUG_PATTERN, group_id):
+            raise ValueError("invalid group_id")
+        team_name = (team or os.environ.get("CQA_TEAM_NAME", "")).strip()
+        if not team_name:
+            raise ValueError("team name is not set: CQA_TEAM_NAME in .env")
+        doc = svc.results(group_id, team_name)
+        headers = {"Content-Disposition": f'attachment; filename="results-{group_id}.json"'} if download else {}
+        return JSONResponse(doc, headers=headers)
+
     @app.get("/api/conversations")
     def list_conversations(group_id: str | None = None):
         return svc.conversations(group_id)

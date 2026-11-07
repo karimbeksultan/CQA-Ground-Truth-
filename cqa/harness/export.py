@@ -125,11 +125,19 @@ def build(run_dir: Path, convs: list[Conversation], team_name: str,
     unknown = sorted(set(preds) - {c.conversation_id for c in convs} - set(rejected))
     if unknown:
         raise ExportError(f"run has dialogs that are not in the group: {unknown}")
+    return build_from_predictions(preds, convs, team_name, meta["evaluator"], rejected)
+
+
+def build_from_predictions(preds: dict[str, dict], convs: list[Conversation], team_name: str,
+                           evaluator: str, rejected: dict[str, str] | None = None) -> dict:
+    """Shared by the CLI (a run directory) and the API (latest stored evaluation per dialog).
+    `preds` maps conversation_id -> {"evaluation", "score", "error"}."""
+    rejected = rejected or {}
     results = [record(preds[c.conversation_id], c) if c.conversation_id in preds
-               else _error_record(c.conversation_id, "диалог не был оценён в этом запуске")
+               else _error_record(c.conversation_id, "диалог не был оценён")
                for c in convs]
     results += [_error_record(cid, reason) for cid, reason in rejected.items()]
-    mode, name = _models(list(preds.values()), meta["evaluator"])
+    mode, name = _models(list(preds.values()), evaluator)
     doc = {"schema_version": SCHEMA_VERSION, "team_name": team_name,
            "model": {"mode": mode, "name": name}, "results": results}
     check(doc, expected_ids=[c.conversation_id for c in convs] + list(rejected))
