@@ -4,9 +4,20 @@ Prototype for the Freedom Broker CQA hackathon: configure a checklist, evaluate 
 in a chat or call transcript (RU / KZ / EN), see points, explanations and the exact turns behind
 each verdict, appeal a criterion and record the reviewer's decision.
 
-> Status: data adapter, checklist engine, deterministic scoring, evaluation harness, LLM evaluators
-> and the HTTP API (jobs, appeals, audio) are in place; the web UI is next (see `progress.md`,
+> Status: data adapter, checklist engine, deterministic scoring, evaluation harness, LLM evaluators,
+> HTTP API (jobs, appeals, audio) and the web UI (RU/EN/KZ) are in place (see `progress.md`,
 > `docs/REQUIREMENTS.md`). Accuracy on our sealed test split: 92.9% criterion agreement, total MAE 4.04.
+
+## Demo path (5 minutes, matches the guide)
+
+1. **Диалоги** → group_id `DEV` → «Импортировать»; tick dialogs → «Оценить выбранные» (progress strip).
+2. Open a dialog: transcript on the left, total, weight ribbon and every criterion with its answer,
+   points, explanation and `#turn` evidence on the right; click `#9` to jump to the turn
+   (calls also seek the recording). A criterion with N/A shows its reason and a hatched ribbon stub.
+3. As **Аналитик**: «Оспорить» on a criterion → comment → send. Switch the role to **Проверяющий**:
+   **Апелляции** → confirm or change with a reason → the total is recalculated and the card shows
+   original → final.
+4. **Чек-листы**: edit a criterion (or «Сохранить как новый»), then «Оценить диалоги этим чек-листом».
 
 ## Run the server
 

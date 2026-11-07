@@ -68,6 +68,15 @@
   (https + allowed hosts + public IPs on every redirect, 1 MB page cap, audio/* only), upload memory cap,
   uploads can no longer carry audio links or overwrite dialogs. 89 tests green; live: p1-ru-001 via API
   = gold 92.31, both call recordings stream (206, audio/mpeg).
+- **Web UI** (`web/`, served at `/`): Freedom + Doom palette (DESIGN.md), RU/EN/KZ, analyst/reviewer
+  roles; dialogs list (import, upload, filters, batch evaluation with live progress), evaluation card
+  (transcript, evidence → turn highlight and call-audio seek, weight ribbon with N/A collapse and
+  original→final animation, sections, gross-error banner, model/cost), appeals + reviewer decisions,
+  checklist editor (save / save as new / evaluate with it). Browser-checked at 1440×900 and 375 px
+  (no horizontal scroll, no console errors), demo path analyst appeal → reviewer decision done live.
+  Independent UI review: no XSS; 3 major (list re-render on polls wiped input/focus, checkbox focus,
+  mouse-only sorting) and minor findings fixed. Known: D365 embedding needs the files bundled or
+  served from one origin plus CQA_CORS_ORIGINS; roles are client-side only (no auth by design).
 - Local engine proven: `ollama` + qwen3:1.7b on CPU evaluated p1-ru-001 end to end (valid JSON first
   call, 2.5k in / 1.2k out tokens) but took 605 s and graded leniently (total 100 vs gold 92.31) —
   fine to demo "works offline", not usable as the primary engine on this laptop.
