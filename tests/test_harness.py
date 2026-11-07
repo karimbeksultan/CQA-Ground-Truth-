@@ -141,6 +141,22 @@ def test_daily_quota_aborts_the_rest_of_the_run(tmp_path, convs):
     assert meta["errors"]["t-ru-call-001"].startswith("skipped: run aborted")
 
 
+def test_import_labels_validates_whole_batch_before_writing(tmp_path, convs):
+    path = tmp_path / "gold.jsonl"
+    ground_truth.save(path, ground_truth.template(convs))
+    good = {"conversation_id": "t-ru-001", "answers": {**PASS, "c07": "no"}, "notes": {"c07": "нет предложения помощи"},
+            "review": ["c07"]}
+    bad = {"conversation_id": "t-ru-call-001", "answers": {**PASS, "c01": "na"}}
+    with pytest.raises(ValueError, match="nothing written"):
+        ground_truth.import_labels(path, [good, bad], labeler="t")
+    assert not ground_truth.load(path)["t-ru-001"].is_complete()
+
+    assert ground_truth.import_labels(path, [good], labeler="t") == ["t-ru-001"]
+    label = ground_truth.load(path)["t-ru-001"]
+    assert label.status == "draft" and label.review == ["c07"] and label.answers["c07"] == "no"
+    assert label.split == ground_truth.assign_splits(convs)["t-ru-001"]
+
+
 def test_split_requires_gold(convs, tmp_path):
     with pytest.raises(ValueError):
         runner.run("TEST", "optimistic", convs=convs, split="dev", gold_path=tmp_path / "none.jsonl",

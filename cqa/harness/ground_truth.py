@@ -32,6 +32,7 @@ class GoldLabel(BaseModel):
     status: Literal["todo", "draft", "reviewed"] = "todo"
     answers: dict[str, Answer | None]
     notes: dict[str, str] = {}
+    review: list[str] = []  # criteria a human should double-check (ambiguous under the rules)
     labeler: str | None = None
 
     def is_complete(self) -> bool:
@@ -92,6 +93,45 @@ def template(convs: list[Conversation], existing: dict[str, GoldLabel] | None = 
                              split=splits[c.conversation_id],
                              answers={cr.id: None for cr in cl.criteria}))
     return out
+
+
+def import_labels(path: Path, updates: list[dict], labeler: str, status: str = "draft") -> list[str]:
+    """Merge {conversation_id, answers, notes?, review?} into the gold file.
+
+    Every update is validated against its checklist with the real scoring rules before anything is
+    written; one bad label rejects the whole batch. Split and checklist id stay as in the template.
+    """
+    from cqa.scoring import score
+
+    labels = load(path)
+    errors: list[str] = []
+    merged: dict[str, GoldLabel] = {}
+    for u in updates:
+        cid = u.get("conversation_id")
+        if cid not in labels:
+            errors.append(f"{cid}: not in {path.name} (run gt-template first)")
+            continue
+        base = labels[cid]
+        cl = checklists.load(base.checklist_id)
+        new = base.model_copy(update={
+            "answers": {**base.answers, **u["answers"]}, "notes": u.get("notes", {}),
+            "review": u.get("review", []), "labeler": labeler, "status": status})
+        new = GoldLabel.model_validate(new.model_dump())  # re-validate answer types
+        try:
+            score(cl, new.complete_answers())
+        except ValueError as exc:
+            errors.append(f"{cid}: {exc}")
+            continue
+        unknown = [c for c in new.review + list(new.notes) if c not in new.answers]
+        if unknown:
+            errors.append(f"{cid}: review/notes for unknown criteria {unknown}")
+            continue
+        merged[cid] = new
+    if errors:
+        raise ValueError("labels rejected, nothing written:\n  " + "\n  ".join(errors))
+    labels.update(merged)
+    save(path, list(labels.values()))
+    return sorted(merged)
 
 
 def dumps_line(label: GoldLabel) -> str:

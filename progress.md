@@ -24,8 +24,17 @@
   `--temperature` flag; re-run showed run-to-run variance (p1-en-001 c07: yes → no), so 0 vs default
   must be compared on the dev split. 55 tests green.
 
+- Gold labels: all 65 DEV dialogs drafted blind (without looking at model output) by Claude under
+  `docs/LABELING.md`, imported with validation (`cqa gt-import`); 54 review flags in 34 dialogs.
+  Gold mean total 82.4; c07 mostly "no" (46/65), c02 mostly N/A (44/65).
+- First measurement, dev split, 10 RU chats (free-tier daily quota ran out after 10):
+  gemini-3.5-flash 84.3% criterion agreement, total MAE 10.25 vs optimistic baseline 51.4% / 24.03.
+  Weakest: c07 60% (bare farewell counted as yes), c02 70% (N/A vs yes).
+- Free tier = **20 requests/day per model** (quota GenerateRequestsPerDayPerProjectPerModel-FreeTier).
+
 ## Next
-1. Gold labels for DEV (blocker for any accuracy number).
+1. User reviews flagged gold labels (grouped by rule in docs/LABELING.md) → status `reviewed`.
+2. Quota strategy (decision): billing, or another model with its own quota for tuning, keep 20/day for the control set.
 2. Run `gemini` on the dev split, read per-criterion report, tune the prompt (interpretations И1–И7).
 3. Compare `gemini-3.5-flash` vs `gemma-4-31b-it` (and `gemini-3.8-flash` when not overloaded), and
    temperature 0 vs default; consider majority vote of 3 runs if variance stays high.

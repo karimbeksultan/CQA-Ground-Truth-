@@ -47,6 +47,25 @@ def cmd_gt_status(a: argparse.Namespace) -> None:
         print(f"  {split:5} {status:8} {'complete' if complete else 'incomplete':10} {n}")
 
 
+def cmd_show(a: argparse.Namespace) -> None:
+    from cqa.evaluators.prompt import SPEAKER
+    wanted = a.ids.split(",")
+    by_id = {c.conversation_id: c for c in data_source.load(a.group)}
+    for cid in wanted:
+        c = by_id[cid]
+        print(f"=== {cid} | {c.language} | {c.channel} | {len(c.transcript)} turns")
+        for t in c.transcript:
+            print(f"[{t.index}] {t.timestamp} {SPEAKER[t.speaker]}: {t.text}")
+        print()
+
+
+def cmd_gt_import(a: argparse.Namespace) -> None:
+    raw = Path(a.file).read_text(encoding="utf-8")
+    updates = [json.loads(l) for l in raw.split("\n") if l.strip()]
+    done = ground_truth.import_labels(ground_truth.golden_path(a.group), updates, labeler=a.labeler, status=a.status)
+    print(f"imported {len(done)} labels: {', '.join(done)}")
+
+
 def cmd_run(a: argparse.Namespace) -> None:
     kwargs = {k: v for k, v in {"model": a.model, "temperature": a.temperature}.items() if v is not None}
     out = runner.run(a.group, a.evaluator, checklist_override=a.checklist,
@@ -82,6 +101,12 @@ def main(argv: list[str] | None = None) -> None:
     f.set_defaults(fn=cmd_fetch)
     t = sub.add_parser("gt-template"); t.add_argument("--group", default="DEV"); t.set_defaults(fn=cmd_gt_template)
     s = sub.add_parser("gt-status"); s.add_argument("--group", default="DEV"); s.set_defaults(fn=cmd_gt_status)
+    sh = sub.add_parser("show"); sh.add_argument("--group", default="DEV"); sh.add_argument("--ids", required=True)
+    sh.set_defaults(fn=cmd_show)
+    gi = sub.add_parser("gt-import")
+    gi.add_argument("--group", default="DEV"); gi.add_argument("--file", required=True)
+    gi.add_argument("--labeler", required=True); gi.add_argument("--status", default="draft", choices=["draft", "reviewed"])
+    gi.set_defaults(fn=cmd_gt_import)
     r = sub.add_parser("run")
     r.add_argument("--group", default="DEV")
     r.add_argument("--evaluator", required=True, choices=evaluators.available())
