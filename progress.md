@@ -31,6 +31,11 @@
   gemini-3.5-flash 84.3% criterion agreement, total MAE 10.25 vs optimistic baseline 51.4% / 24.03.
   Weakest: c07 60% (bare farewell counted as yes), c02 70% (N/A vs yes).
 - Free tier = **20 requests/day per model** (quota GenerateRequestsPerDayPerProjectPerModel-FreeTier).
+- gemma-4-31b-it (same API key) on the full dev split, 26/26, no quota hit, ~104 s per dialog:
+  86.3% agreement, total MAE 7.10, ±10 in 80.8% (baseline 53.3% / 18.14). On the 10 dialogs Gemini
+  covered: gemma 82.9% / MAE 7.74 vs gemini 84.3% / 10.25 — on par. Weak spots for both: c07
+  (bare farewell → "yes") and c06 (missed 4/7 steps). Gemma becomes the tuning engine.
+- OpenAI-compatible client (Groq, Cerebras, OpenRouter, Mistral, Ollama, FreeLLMAPI) committed after review.
 
 ## Next
 1. User reviews flagged gold labels (grouped by rule in docs/LABELING.md) → status `reviewed`.
