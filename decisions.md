@@ -24,6 +24,14 @@ free tier; tokens are logged per evaluation. The key is sent in a header, never 
 The evaluator interface keeps several backends; the primary one is chosen by dev-split accuracy once
 gold labels exist. Local Ollama stays the planned second engine for the diversity criterion.
 
+## D8 — One OpenAI-compatible client instead of installing a router
+The Gemini free tier allows only 20 requests/day per model. Rather than embedding FreeLLMAPI (1300+
+files, Docker, self-updating catalog, may route one run to several models, sends data to many
+providers), the project has one small client for any OpenAI-compatible API with presets for Groq,
+Cerebras, OpenRouter, Mistral, local Ollama and a local FreeLLMAPI router. Every run pins one model
+(`--model` is mandatory), so accuracy numbers stay comparable; local Ollama covers the
+"local LLM" side of the diversity criterion. Which engine is primary is decided by dev-split accuracy.
+
 ## D7 — The prompt is generated from the checklist on every evaluation
 Every criterion field (rule, N/A rule, scale steps, guidance, allowed answers) is rendered into the
 prompt, so a criterion changed in the UI is applied immediately — the "process correctness" criterion.

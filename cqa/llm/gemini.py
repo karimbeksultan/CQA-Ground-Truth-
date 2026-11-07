@@ -120,4 +120,5 @@ class GeminiClient:
         u = payload.get("usageMetadata", {})
         usage = {"prompt_tokens": u.get("promptTokenCount", 0), "output_tokens": u.get("candidatesTokenCount", 0),
                  "thinking_tokens": u.get("thoughtsTokenCount", 0)}
-        return LLMReply(text=text, usage=usage)
+        # recorded, not enforced: Gemini aliases (e.g. *-latest) legitimately report a concrete version
+        return LLMReply(text=text, usage=usage, served_model=payload.get("modelVersion"))

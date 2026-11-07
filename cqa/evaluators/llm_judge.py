@@ -102,11 +102,13 @@ class LLMJudge:
 
     def evaluate(self, conv: Conversation, checklist: Checklist) -> Evaluation:
         messages = [Message("user", user_prompt(conv, checklist))]
-        usage = {"prompt_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "calls": 0}
+        usage: dict = {"prompt_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "calls": 0, "served_models": []}
         raw = ""
         for round_ in range(self.repair_rounds + 1):
             reply = self.client.generate(SYSTEM, messages, RESPONSE_SCHEMA)
             usage["calls"] += 1
+            if reply.served_model and reply.served_model not in usage["served_models"]:
+                usage["served_models"].append(reply.served_model)
             for k in ("prompt_tokens", "output_tokens", "thinking_tokens"):
                 usage[k] += int(reply.usage.get(k) or 0)
             raw = reply.text
@@ -130,3 +132,15 @@ class LLMJudge:
 def gemini_judge(model: str | None = None, **kwargs: object) -> LLMJudge:
     from cqa.llm.gemini import DEFAULT_MODEL, GeminiClient
     return LLMJudge(GeminiClient(model or DEFAULT_MODEL, **kwargs), name="gemini")
+
+
+def _openai_compat_factory(provider: str):
+    def factory(model: str | None = None, **kwargs: object) -> LLMJudge:
+        from cqa.llm.openai_compat import OpenAICompatClient, resolve
+        base, key = resolve(provider)
+        return LLMJudge(OpenAICompatClient(model or "", base, key, provider=provider, **kwargs), name=provider)
+    return factory
+
+
+for _provider in ("groq", "cerebras", "openrouter", "mistral", "ollama", "freellmapi"):
+    register(_provider)(_openai_compat_factory(_provider))

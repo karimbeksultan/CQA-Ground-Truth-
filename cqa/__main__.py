@@ -68,6 +68,8 @@ def cmd_gt_import(a: argparse.Namespace) -> None:
 
 def cmd_run(a: argparse.Namespace) -> None:
     kwargs = {k: v for k, v in {"model": a.model, "temperature": a.temperature}.items() if v is not None}
+    if a.no_json_mode:
+        kwargs["json_mode"] = False
     out = runner.run(a.group, a.evaluator, checklist_override=a.checklist,
                      ids=a.ids.split(",") if a.ids else None, split=a.split, workers=a.workers,
                      evaluator_kwargs=kwargs or None)
@@ -115,6 +117,8 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--split", choices=["train", "dev", "test"])
     r.add_argument("--model", help="model name for LLM evaluators, e.g. gemini-3.5-flash")
     r.add_argument("--temperature", type=float, help="sampling temperature (default: the model's own)")
+    r.add_argument("--no-json-mode", action="store_true",
+                   help="OpenAI-compatible engines: don't request response_format=json_object")
     r.add_argument("--workers", type=int, default=4)
     r.set_defaults(fn=cmd_run)
     c = sub.add_parser("compare"); c.add_argument("--run", required=True); c.add_argument("--group")

@@ -19,6 +19,18 @@ Model: `gemini-3.5-flash` on the Google AI Studio free tier (cost per evaluation
 ~2k output tokens per dialog, logged in each evaluation). Other models: `--model gemma-4-31b-it`.
 Without a key, `--evaluator optimistic` runs the non-LLM baseline.
 
+Other engines (any OpenAI-compatible API, one pinned model per run — `--model` is required):
+
+| evaluator | where | key in `.env` |
+|---|---|---|
+| `ollama` | local Ollama, `http://localhost:11434/v1` | — |
+| `groq`, `cerebras`, `openrouter`, `mistral` | provider's cloud API | `GROQ_API_KEY`, … |
+| `freellmapi` | local FreeLLMAPI router, `http://localhost:3001/v1` | `FREELLMAPI_API_KEY` |
+
+```bash
+.venv\Scripts\python -m cqa run --group DEV --evaluator ollama --model qwen3:1.7b --ids p1-ru-001
+```
+
 Tests: `.venv\Scripts\python -m pytest -q`
 
 ## Layout

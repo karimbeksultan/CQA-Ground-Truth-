@@ -23,10 +23,15 @@ class Message:
     text: str
 
 
+class ModelMismatch(LLMError, FatalRunError):
+    """The API answered with a different model than the one pinned for the run."""
+
+
 @dataclass
 class LLMReply:
     text: str
     usage: dict = field(default_factory=dict)
+    served_model: str | None = None  # model name the API reports it actually used
 
 
 class LLMClient(Protocol):
