@@ -26,7 +26,7 @@ dialogs) are produced by the system, not by hand. Control hour (T+23 → T+24), 
 from the organizers in place of `<GROUP>`:
 
 ```bash
-.venv\Scripts\python -m cqa fetch --group <GROUP>
+.venv\Scripts\python -m cqa fetch --group <GROUP> --refresh
 .venv\Scripts\python -m cqa run --group <GROUP> --evaluator chain --engines cloud --workers 3
 .venv\Scripts\python -m cqa rerun --run runs/<run-id>
 .venv\Scripts\python -m cqa export --run runs/<run-id> --set prod
