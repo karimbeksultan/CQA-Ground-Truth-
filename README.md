@@ -27,7 +27,7 @@ from the organizers in place of `<GROUP>`:
 
 ```bash
 .venv\Scripts\python -m cqa fetch --group <GROUP>
-.venv\Scripts\python -m cqa run --group <GROUP> --evaluator chain --workers 3
+.venv\Scripts\python -m cqa run --group <GROUP> --evaluator chain --engines cloud --workers 3
 .venv\Scripts\python -m cqa rerun --run runs/<run-id>
 .venv\Scripts\python -m cqa export --run runs/<run-id> --set prod
 .venv\Scripts\python -m cqa check-results results/prod/results.json --group <GROUP>
@@ -56,7 +56,7 @@ this repository, then fill the secret values in the dashboard:
 |---|---|
 | `CQA_API_URL` | the organizers' GET link without `&group_id=...` |
 | `GEMINI_API_KEY` | Google AI Studio key |
-| `CQA_BASIC_AUTH` | `login:password` for the jury (the whole app is behind HTTP Basic; `/api/health` stays open) |
+| `CQA_BASIC_AUTH` | optional `login:password`; the guide says the demo needs no login, so leave it empty for the jury link (set it only for a link you do not share) |
 
 On boot the container imports DEV from the organizer API and shows the committed
 `results/dev/results.json` (marked as its source); new evaluations from the UI run live through the engine
@@ -87,8 +87,9 @@ copy .env.example .env   # paste the organizers' GET link (without &group_id=...
 .venv\Scripts\python -m cqa run --group DEV --evaluator gemini --ids p1-ru-001
 ```
 
-Model: `gemini-3.5-flash` on the Google AI Studio free tier (cost per evaluation: $0; ~2–4k input and
-~2k output tokens per dialog, logged in each evaluation). Other models: `--model gemma-4-31b-it`.
+Model: the engine chain (`--evaluator chain`) — primary `gemma-4-31b-it` at temperature 0 on the Google AI
+Studio free tier (cost per evaluation: $0; ~3k input and ~1–2k output tokens per dialog, logged in each
+evaluation), then Gemini fallbacks and local Ollama. A single model: `--evaluator gemini --model <name>`.
 Without a key, `--evaluator optimistic` runs the non-LLM baseline.
 
 Other engines (any OpenAI-compatible API, one pinned model per run — `--model` is required):

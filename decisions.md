@@ -47,10 +47,11 @@ Cerebras, OpenRouter, Mistral, local Ollama and a local FreeLLMAPI router. Every
   or CQA_AUDIO_HOSTS) resolving to public IPs, checked on every redirect; uploads drop audio links.
 
 ## D13 — Gemma runs at temperature 0
-Measured on the dev split (same 25 dialogs, current checklists): temperature 0 gave 96.5% criterion
-agreement and total MAE 1.25 against 95.0% / 2.40 at the model default; 97.5% of answers were identical
-between the two runs. The sample is small, but temperature 0 is also the more repeatable setting for a
-one-shot control set. Gemini fallbacks keep their default temperature (Google's advice for Gemini 3).
+Measured on the dev split (same 25 dialogs, current checklists): temperature 0 gave 96.0% criterion
+agreement on scored criteria and total MAE 1.25 against 94.9% / 2.40 at the model default; 97.5% of answers
+were identical between the two runs. Per dialog 21 tied, 3 better, 1 worse (sign test p≈0.6), and most of the
+MAE gain is one dialog — so this is **not** a proven accuracy gain. The reason to keep it is repeatability on
+a one-shot control set. Gemini fallbacks keep their default temperature (Google's advice for Gemini 3).
 
 ## D12 — c07: a farewell after a resolved question is Да
 Reversed after the review panel (team decision, 2026-11-07). The checklist sentence allows both

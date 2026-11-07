@@ -109,14 +109,11 @@
     ≈ 7–9 min at 3 workers.
 
 ## Next
-1. User reviews flagged gold labels (grouped by rule in docs/LABELING.md) → status `reviewed`.
-2. Quota strategy (decision): billing, or another model with its own quota for tuning, keep 20/day for the control set.
-2. Run `gemini` on the dev split, read per-criterion report, tune the prompt (interpretations И1–И7).
-3. Compare `gemini-3.5-flash` vs `gemma-4-31b-it` (and `gemini-3.8-flash` when not overloaded), and
-   temperature 0 vs default; consider majority vote of 3 runs if variance stays high.
-4. FastAPI: checklists CRUD, conversations, evaluate, appeals, reviewer decisions.
-5. Web UI (plain HTML/JS): checklist editor, dialog list, result card with jump-to-turn, audio player, appeal flow.
-6. Control-set rehearsal: new group_id end-to-end, replace a criterion via UI, re-evaluate.
+1. Control hour (T+23): fetch the new group → `run --evaluator chain --engines cloud` → `rerun` → `export --set prod`
+   → `check-results --group` → commit and push `results/prod/results.json` → only then the live criterion swap
+   in the UI («Сохранить как новый» is automatic for default checklists).
+2. A human review of ~20 gold dialogs on c02/c05/c06/c07 to measure our labels against a person, not only Claude.
+3. Defense deck and a timed rehearsal of the 5-minute plan (guide p.4).
 
 ## Risks
 - No organizer ground truth for DEV: our accuracy number is only as good as our gold labels.
