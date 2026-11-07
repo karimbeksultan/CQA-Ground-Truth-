@@ -181,3 +181,12 @@ def test_providers_registered_and_missing_key_is_reported(monkeypatch):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://10.0.0.5:11434/v1/")
     judge = evaluators.create("ollama", model="qwen3:1.7b")
     assert judge.model == "qwen3:1.7b" and judge.client._url == "http://10.0.0.5:11434/v1/chat/completions"
+
+
+def test_gemma_engine_runs_at_temperature_zero_and_gemini_keeps_default(monkeypatch):
+    from cqa.engines import EngineSpec
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")  # no network: only the clients are built
+    gemma = EngineSpec.parse("gemini:gemma-4-31b-it").create()
+    flash = EngineSpec.parse("gemini:gemini-3.5-flash").create()
+    assert gemma.client.temperature == 0.0
+    assert flash.client.temperature is None

@@ -41,7 +41,12 @@ class EngineSpec:
         return f"{self.evaluator}:{self.model}" if self.model else self.evaluator
 
     def create(self) -> evaluators.Evaluator:
-        return evaluators.create(self.evaluator, **({"model": self.model} if self.model else {}))
+        kwargs: dict = {"model": self.model} if self.model else {}
+        # D13: Gemma at temperature 0 (dev split: 96.5% / MAE 1.25 vs 95.0% / 2.40 at the default, same 25
+        # dialogs). Gemini models keep their default: Google advises against lowering it for Gemini 3.
+        if self.evaluator == "gemini" and (self.model or "").startswith("gemma"):
+            kwargs["temperature"] = 0.0
+        return evaluators.create(self.evaluator, **kwargs)
 
 
 def configured() -> list[EngineSpec]:
