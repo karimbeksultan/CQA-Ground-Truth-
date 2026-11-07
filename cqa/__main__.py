@@ -144,6 +144,17 @@ def cmd_check_results(a: argparse.Namespace) -> None:
     print(f"OK: {len(doc['results'])} dialogs, {n_err} errors, schema {doc['schema_version']}")
 
 
+def cmd_load_run(a: argparse.Namespace) -> None:
+    from cqa.service import Service
+    svc = Service(workers=1, resume_jobs=False)  # the running server owns the jobs
+    meta = json.loads((Path(a.run) / "run.json").read_text(encoding="utf-8"))
+    svc.import_group(meta["group_id"])  # dialogs first, from the cache or the API
+    res = svc.import_run(Path(a.run))
+    print(f"stored {res['stored']} evaluations from {a.run} (source run:{meta['run_id']})")
+    for cid, why in res["skipped"].items():
+        print(f"  skipped {cid}: {why}")
+
+
 def cmd_checklists(_: argparse.Namespace) -> None:
     for cl in checklists.list_all():
         weights = sum(c.weight for c in cl.criteria)
@@ -191,6 +202,8 @@ def main(argv: list[str] | None = None) -> None:
     cr = sub.add_parser("check-results", help="validate a results.json against the format (and the group ids)")
     cr.add_argument("file"); cr.add_argument("--group", help="also require exactly this group's ids")
     cr.set_defaults(fn=cmd_check_results)
+    lr = sub.add_parser("load-run", help="show a CLI run's evaluations in the web UI (stored with the run id as source)")
+    lr.add_argument("--run", required=True); lr.set_defaults(fn=cmd_load_run)
     sub.add_parser("checklists").set_defaults(fn=cmd_checklists)
     a = p.parse_args(argv)
     a.fn(a)

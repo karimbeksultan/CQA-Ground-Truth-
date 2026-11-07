@@ -184,6 +184,17 @@ const S = {
   "cl.removeConfirm": ["Удалить критерий {id}?", "Remove criterion {id}?", "{id} критерийін жою керек пе?"],
   "view.big": ["Крупный текст (проектор)", "Large text (projector)", "Ірі мәтін (проектор)"],
 
+  "dialogs.autoHint": ["Авто: чат → чатов, звонок → звонков", "Auto: chat → chat list, call → call list", "Авто: чат → чат, қоңырау → қоңырау"],
+  "sum.label": ["Сводка по набору", "Set summary", "Жиын бойынша жиынтық"],
+  "sum.evaluated": ["из {total} оценено", "of {total} evaluated", "{total} ішінен бағаланды"],
+  "sum.avg": ["средний итог", "average total", "орташа қорытынды"],
+  "sum.gross": ["с грубыми нарушениями", "with gross violations", "өрескел бұзушылықпен"],
+  "sum.stripLabel": ["Средняя доля баллов по критериям", "Average share of points per criterion", "Критерийлер бойынша ұпайдың орташа үлесі"],
+  "sum.critTip": ["{name}: в среднем {pct} баллов там, где применим ({n} диалогов, N/A: {na}); потеря баллов в {lost}", "{name}: {pct} of points on average where it applies ({n} dialogs, N/A: {na}); points lost in {lost}", "{name}: қолданылған жерде орта есеппен {pct} ұпай ({n} диалог, N/A: {na}); ұпай жоғалтқаны: {lost}"],
+  "sum.hint": ["Ширина — вес критерия, заливка — средняя доля полученных баллов. Нажмите на критерий, чтобы увидеть диалоги, где оператор терял по нему баллы.", "Width is the criterion's weight, fill the average share of points earned. Click a criterion to see the dialogs that lost points on it.", "Ені — критерий салмағы, бояуы — алынған ұпайдың орташа үлесі. Оператор ұпай жоғалтқан диалогтарды көру үшін критерийді басыңыз."],
+  "sum.filterOn": ["Показаны диалоги, где оператор терял баллы по {id} «{name}».", "Showing dialogs that lost points on {id} “{name}”.", "{id} «{name}» бойынша ұпай жоғалтқан диалогтар көрсетілген."],
+  "sum.clear": ["Показать все", "Show all", "Барлығын көрсету"],
+
   "err.network": ["Сервер не отвечает. Проверьте, что запущен uvicorn.", "The server is not responding. Check that uvicorn is running.", "Сервер жауап бермейді. uvicorn іске қосылғанын тексеріңіз."],
   "err.prefix": ["Ошибка", "Error", "Қате"],
 };

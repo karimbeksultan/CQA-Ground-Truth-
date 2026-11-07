@@ -37,8 +37,10 @@
   --radius: 6px;
   --radius-lg: 10px;
   --rail: 236px;
-  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
-  --font-num: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font: "Onest", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --font-num: "Onest", "Segoe UI", system-ui, sans-serif;
+  /* score figures: Unbounded digits (self-hosted, digits only), the armour-plate voice of the numbers */
+  --font-fig: "Unbounded", "Onest", "Segoe UI", system-ui, sans-serif;
   --ease: cubic-bezier(.16, 1, .3, 1);
   --shadow: 0 8px 24px rgba(0, 0, 0, .45), 0 1px 0 rgba(255, 255, 255, .03) inset;
   font-size: 15px;
@@ -188,7 +190,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .93rem; }
 .tag svg { width: 13px; height: 13px; stroke: currentColor; }
 .tag.call { border-color: #3d5a7a; color: #a8c7ea; }
 .tag.lang { min-width: 30px; justify-content: center; }
-.score { font-family: var(--font-num); font-weight: 700; font-size: 1rem; }
+.score { font-family: var(--font-fig); font-weight: 600; font-size: .95rem; letter-spacing: -.01em; }
 .score.hi { color: var(--ok); } .score.mid { color: var(--warn); } .score.lo { color: var(--bad); }
 .flag-gross { display: inline-flex; align-items: center; gap: 5px; color: var(--bad); font-weight: 700; font-size: .82rem; }
 .flag-gross svg { width: 14px; height: 14px; stroke: currentColor; }
@@ -240,7 +242,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .93rem; }
 .player audio { width: 100%; height: 34px; color-scheme: dark; }
 
 .result-head { padding: 16px; display: grid; grid-template-columns: auto 1fr; gap: 6px 20px; align-items: center; border-bottom: 1px solid var(--steel-1); }
-.total { font-family: var(--font-num); font-size: 3rem; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+.total { font-family: var(--font-fig); font-size: 3rem; font-weight: 700; line-height: 1; letter-spacing: -.03em; }
 .total small { font-size: 1rem; color: var(--text-3); font-weight: 600; margin-left: 4px; }
 .total-meta { display: flex; flex-direction: column; gap: 4px; font-size: .88rem; color: var(--text-2); }
 .total-meta .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -313,7 +315,7 @@ table.grid { width: 100%; border-collapse: collapse; font-size: .93rem; }
 .fragment { margin-top: 10px; max-height: 220px; overflow: auto; border: 1px solid var(--steel-1); border-radius: var(--radius); padding: 4px; }
 .decide { display: flex; flex-direction: column; gap: 10px; }
 .decide .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.delta { font-family: var(--font-num); font-size: 1.4rem; font-weight: 700; }
+.delta { font-family: var(--font-fig); font-size: 1.4rem; font-weight: 700; }
 .delta .arrow { color: var(--text-3); margin: 0 8px; }
 
 /* ---------- checklist editor ---------- */
@@ -368,3 +370,42 @@ html.big { font-size: 18px; --text-3: var(--text-2); }
 /* before/after: what a changed checklist or a re-run changed */
 .status-pill.new { margin-left: 8px; background: rgba(0, 198, 132, .16); color: #06fca8; border: 1px solid rgba(6, 252, 168, .35); }
 .was-answer { margin-left: 8px; font-size: .78rem; color: var(--text-2); text-decoration: line-through; text-decoration-color: rgba(255,255,255,.35); }
+
+/* toolbar rows: data source + filters, then the action bar */
+.actionbar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin: -6px 0 16px; padding: 12px 14px;
+  background: linear-gradient(90deg, var(--cloak) 0%, var(--panel) 70%); border: 1px solid var(--steel-1); border-top: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+.actionbar .spacer { flex: 1; }
+.actionbar .field select { min-width: 260px; }
+
+/* set summary: the ribbon language applied to a whole set */
+.set-summary { margin: 0 0 16px; padding: 14px 16px 12px; border: 1px solid var(--steel-1); border-radius: var(--radius-lg);
+  background: var(--panel); }
+.set-summary .facts { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-bottom: 12px; }
+.set-summary .facts p { margin: 0; display: flex; align-items: baseline; gap: 8px; color: var(--text-2); font-size: .9rem; }
+.set-summary .fig { font-family: var(--font-fig); font-weight: 600; font-size: 1.35rem; color: var(--text); letter-spacing: -.02em; }
+.set-summary .fig.hi { color: var(--ok); } .set-summary .fig.mid { color: var(--warn); } .set-summary .fig.lo { color: var(--bad); }
+.crit-strip { display: flex; gap: 3px; height: 44px; }
+.cs { position: relative; flex-basis: 0; min-width: 84px; border: 1px solid var(--steel-1); border-radius: 4px; background: var(--ground-2);
+  overflow: hidden; cursor: pointer; padding: 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  color: var(--text); font: inherit; transition: border-color .2s var(--ease); }
+.cs i { position: absolute; inset: 0 auto 0 0; width: var(--f); background: var(--fr-deep-2); transition: width .9s var(--ease); }
+.cs.full i { background: var(--fr-green); }
+.cs.na { background: repeating-linear-gradient(135deg, var(--panel-2) 0 4px, var(--ground) 4px 8px); border-style: dashed; }
+.cs > span { position: relative; font-size: .78rem; font-weight: 700; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.cs .cs-v { font-family: var(--font-fig); font-weight: 600; }
+.cs:hover:not(:disabled), .cs[aria-pressed="true"] { border-color: var(--fr-mint); }
+.cs[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--fr-mint) inset, 0 4px 14px rgba(6, 227, 154, .18); }
+.cs:disabled { cursor: default; }
+.strip-note { margin: 8px 0 0; font-size: .8rem; color: var(--text-3); }
+.linkish { background: none; border: 0; padding: 0; color: var(--fr-mint); font: inherit; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 3px; }
+@media (max-width: 760px) {
+  .crit-strip { flex-wrap: wrap; height: auto; }
+  .cs { flex: 1 1 30%; height: 40px; }
+  .actionbar .field select { min-width: 0; width: 100%; }
+}
+.toolbar:has(+ .actionbar) { margin-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.actionbar { margin-top: 0; }
+input[type="checkbox"] { accent-color: var(--fr-green); }
+@media (max-width: 760px) { .big-toggle { display: none; } }

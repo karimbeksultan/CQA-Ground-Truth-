@@ -98,7 +98,7 @@ const state = {
   engine: "",
   openAppeals: 0,
   selected: new Set(),
-  filters: { q: "", channel: "", language: "", group: store.get("group", "") },
+  filters: { q: "", channel: "", language: "", group: store.get("group", ""), crit: "" },
   engineOptions: [],
   sort: { key: "conversation_id", dir: 1 },
   checklistChoice: "",
@@ -193,13 +193,24 @@ async function refreshConversations() {
 // focus and selection survive the 2.5 s job polls.
 let dialogsRefs = null;
 
-function filteredRows() {
+function scopeRows() {
   const f = state.filters;
   return state.conversations
     .filter((c) => !f.group || c.group_id === f.group)
-    .filter((c) => !f.q || c.conversation_id.toLowerCase().includes(f.q.toLowerCase()))
     .filter((c) => !f.channel || c.channel === f.channel)
-    .filter((c) => !f.language || c.language === f.language)
+    .filter((c) => !f.language || c.language === f.language);
+}
+
+const lostPoints = (c, id) => {
+  const v = c.latest_evaluation?.status === "done" ? c.latest_evaluation.criteria?.[id] : undefined;
+  return v != null && v < 1;
+};
+
+function filteredRows() {
+  const f = state.filters;
+  return scopeRows()
+    .filter((c) => !f.q || c.conversation_id.toLowerCase().includes(f.q.toLowerCase()))
+    .filter((c) => !f.crit || lostPoints(c, f.crit))
     .sort((a, b) => {
       const key = state.sort.key;
       const va = key === "total" ? a.latest_evaluation?.total ?? -1 : a[key];
@@ -287,8 +298,49 @@ function dialogsTable() {
     }))));
 }
 
+/** Set summary: how the operators in the chosen set did, criterion by criterion. Segment width = the
+ * criterion's weight, fill = average share of its points earned where it applied (N/A excluded).
+ * A click narrows the table to the dialogs that lost points on that criterion. */
+function setSummary() {
+  const rows = scopeRows();
+  const done = rows.filter((c) => c.latest_evaluation?.status === "done");
+  if (!done.length) return null;
+  const f = state.filters;
+  const totals = done.map((c) => c.latest_evaluation.total).filter((v) => v != null);
+  const avg = totals.length ? totals.reduce((a, b) => a + b, 0) / totals.length : null;
+  const gross = done.filter((c) => c.latest_evaluation.gross_error).length;
+  const ref = state.checklists.find((c) => c.id === "chat_default_v1") || state.checklists[0];
+  const crits = (ref?.criteria || []).filter((c) => c.type !== "flag" && c.weight > 0);
+  const segs = crits.map((c) => {
+    const vals = done.map((r) => r.latest_evaluation.criteria?.[c.id]).filter((v) => v !== undefined);
+    const applied = vals.filter((v) => v != null);
+    const mean = applied.length ? applied.reduce((a, b) => a + b, 0) / applied.length : null;
+    const losers = done.filter((r) => lostPoints(r, c.id)).length;
+    const pct = mean == null ? "N/A" : `${Math.round(mean * 100)}%`;
+    const tip = t("sum.critTip", { name: c.name, pct, n: applied.length, na: vals.length - applied.length, lost: losers });
+    return h("button", { type: "button", class: `cs ${mean == null ? "na" : mean >= 0.995 ? "full" : ""}`,
+      style: `flex-grow:${c.weight};--f:${mean == null ? 0 : (mean * 100).toFixed(1)}%`, title: tip, "aria-label": tip,
+      "aria-pressed": String(f.crit === c.id), disabled: !losers && f.crit !== c.id,
+      onclick: () => { f.crit = f.crit === c.id ? "" : c.id; refreshTable(); } },
+      h("i", { "aria-hidden": "true" }), h("span", { class: "cs-id" }, c.id), h("span", { class: "cs-v" }, pct));
+  });
+  const active = crits.find((c) => c.id === f.crit);
+  return h("section", { class: "set-summary", "aria-label": t("sum.label") },
+    h("div", { class: "facts" },
+      h("p", {}, h("b", { class: "fig" }, `${done.length}`), h("span", {}, t("sum.evaluated", { total: rows.length }))),
+      avg != null ? h("p", {}, h("b", { class: `fig ${scoreClass(avg)}` }, fmt(avg)), h("span", {}, t("sum.avg"))) : null,
+      h("p", {}, h("b", { class: `fig ${gross ? "lo" : ""}` }, `${gross}`), h("span", {}, t("sum.gross")))),
+    h("div", { class: "crit-strip", role: "group", "aria-label": t("sum.stripLabel") }, segs),
+    h("p", { class: "strip-note" }, active
+      ? [t("sum.filterOn", { id: active.id, name: active.name }), " ",
+         h("button", { type: "button", class: "linkish", onclick: () => { f.crit = ""; refreshTable(); } }, t("sum.clear"))]
+      : t("sum.hint")));
+}
+
 function refreshTable() {
-  if (dialogsRefs) dialogsRefs.tableHost.replaceChildren(dialogsTable());
+  if (!dialogsRefs) return;
+  dialogsRefs.tableHost.replaceChildren(dialogsTable());
+  dialogsRefs.summaryHost.replaceChildren(...[setSummary()].filter(Boolean));
 }
 
 /** Job poll on the dialogs page: refresh the strip always, the table only when focus is not inside it. */
@@ -337,7 +389,8 @@ function dialogsView() {
     } }, evalLabel);
   const jobsHost = h("div", { class: "jobs-host" }, jobStrip());
   const tableHost = h("div", { class: "table-host" }, dialogsTable());
-  dialogsRefs = { evalBtn, evalLabel, jobsHost, tableHost };
+  const summaryHost = h("div", { class: "summary-host" }, setSummary());
+  dialogsRefs = { evalBtn, evalLabel, jobsHost, tableHost, summaryHost };
   updateEvalButton();
   const field = (label, control, cls = "") => h("label", { class: `field ${cls}` }, h("span", {}, label), control);
   const groups = [...new Set(state.conversations.map((c) => c.group_id).filter(Boolean))].sort();
@@ -347,6 +400,7 @@ function dialogsView() {
     hidden: !f.group, title: t("dialogs.resultsHint") }, t("dialogs.results"));
   const groupSelect = h("select", { class: "input", onchange: (e) => {
     f.group = e.target.value;
+    f.crit = "";
     resultsLink.hidden = !f.group;
     if (f.group) { resultsLink.href = resultsHref(); resultsLink.setAttribute("download", `results-${f.group}.json`); }
     refreshTable(); updateEvalButton();
@@ -362,16 +416,17 @@ function dialogsView() {
       field(t("dialogs.show"), groupSelect),
       field(t("dialogs.search"), h("input", { class: "input", type: "search", value: f.q, placeholder: "p1-ru-001",
         oninput: (e) => { f.q = e.target.value; refreshTable(); } }), "grow"),
-      field(t("dialogs.channel"), h("select", { class: "input", onchange: (e) => { f.channel = e.target.value; refreshTable(); } },
+      field(t("dialogs.channel"), h("select", { class: "input", onchange: (e) => { f.channel = e.target.value; f.crit = ""; refreshTable(); } },
         [["", t("dialogs.all")], ["agent chat", t("dialogs.chat")], ["voice call", t("dialogs.call")]].map(([v, l]) => h("option", { value: v, selected: f.channel === v }, l)))),
-      field(t("dialogs.language"), h("select", { class: "input", onchange: (e) => { f.language = e.target.value; refreshTable(); } },
-        [["", t("dialogs.all")], ["RU", "RU"], ["KZ", "KZ"], ["EN", "EN"]].map(([v, l]) => h("option", { value: v, selected: f.language === v }, l)))),
-      h("div", { class: "sep" }),
+      field(t("dialogs.language"), h("select", { class: "input", onchange: (e) => { f.language = e.target.value; f.crit = ""; refreshTable(); } },
+        [["", t("dialogs.all")], ["RU", "RU"], ["KZ", "KZ"], ["EN", "EN"]].map(([v, l]) => h("option", { value: v, selected: f.language === v }, l))))),
+    h("div", { class: "actionbar" },
       field(t("dialogs.checklist"), h("select", { class: "input", onchange: (e) => { state.checklistChoice = e.target.value; } },
-        h("option", { value: "" }, t("dialogs.auto")),
-        state.checklists.map((c) => h("option", { value: c.id, selected: c.id === state.checklistChoice }, `${c.name} · v${c.version}`)))),
-      evalBtn, resultsLink),
+        h("option", { value: "" }, t("dialogs.autoHint")),
+        state.checklists.map((c) => h("option", { value: c.id, selected: c.id === state.checklistChoice }, `${c.name}, v${c.version}`)))),
+      evalBtn, h("div", { class: "spacer" }), resultsLink),
     jobsHost,
+    summaryHost,
     tableHost,
   ];
 }

@@ -19,8 +19,10 @@ Freedom presentation.
 | Freedom deep greens (partial fill) | `--fr-deep` / `--fr-deep-2` | `#004820` / `#007040` |
 | States | `--ok` / `--warn` / `--bad` | mint / `#e7b44a` / `#ff6b61` |
 
-Type: system UI sans (Segoe UI Variable on Windows), tabular numerals everywhere, no web fonts
-(works offline and covers Kazakh letters). Radius 6/10 px. One shadow token for toasts only.
+Type: **Onest** for all text (self-hosted in `web/fonts/`, OFL; full Kazakh coverage via
+cyrillic-ext, tabular numerals) and **Unbounded** for score figures only (totals, list scores, set
+summary; digits subset, because Unbounded lacks most Kazakh letters). No external requests, so the
+D365 web resource and offline demo keep working. Radius 6/10 px. One shadow token for toasts only.
 
 ## Components
 
@@ -38,6 +40,16 @@ redistribution). Earned share fills each segment (Freedom green when full, deep 
 N/A criteria collapse to a hatched stub. When a reviewer decision changed the score, the ribbon
 opens on the original evaluation and animates to the final one. Clicking a segment focuses its
 criterion.
+
+## Set summary (dialogs page)
+
+The weight-ribbon language applied to a whole set: one strip of non-flag criteria, segment width =
+weight, fill = average share of points earned where the criterion applied (N/A hatched). Three plain
+facts above it (evaluated, average total, gross violations) — figures in Unbounded, labels inline, not
+stat cards. Clicking a segment narrows the table to the dialogs that lost points on that criterion.
+
+Intentional detector exceptions: the job dot pulses only while a job is live (real state), and the
+diagonal hatch marks N/A (semantic, not decoration).
 
 ## Motion
 

@@ -231,8 +231,56 @@ class Service:
                             "id": ev["id"], "status": ev["status"], "checklist_id": ev["checklist_id"],
                             "total": (ev.get("final_score") or {}).get("total"),
                             "gross_error": (ev.get("final_score") or {}).get("gross_error"),
+                            # earned share per criterion (None = N/A) for the set summary on the list page
+                            "criteria": {c["criterion_id"]: (None if c["points"] is None or not c["effective_weight"]
+                                                             else round(c["points"] / c["effective_weight"], 4))
+                                         for c in (ev.get("final_score") or {}).get("criteria", [])
+                                         if c.get("weight")},
                             "open_appeals": self._open_appeals(ev["id"])}})
         return out
+
+    def import_run(self, run_dir: Path, group_id: str | None = None) -> dict:
+        """Store the evaluations of a CLI run (python -m cqa run) so the UI shows them. Each record keeps
+        the run id as its source; checklists are snapshotted only when the run's fingerprint still matches.
+        Dialogs must already be imported; failed predictions are skipped (the run report lists them)."""
+        import json as _json
+
+        from cqa.harness.runner import load_predictions
+
+        meta = _json.loads((Path(run_dir) / "run.json").read_text(encoding="utf-8"))
+        group = group_id or meta["group_id"]
+        snapshots: dict[str, Checklist] = {}
+        stored, skipped = 0, {}
+        latest = {}
+        for rec in load_predictions(Path(run_dir)):
+            latest[rec["conversation_id"]] = rec
+        for cid, rec in latest.items():
+            if rec.get("error") or not rec.get("evaluation"):
+                skipped[cid] = "failed in the run"
+                continue
+            try:
+                self.store.get("conversations", cid)
+            except NotFound:
+                skipped[cid] = f"dialog not imported (import group {group} first)"
+                continue
+            cl_id = rec["checklist_id"]
+            if cl_id not in snapshots:
+                snapshots[cl_id] = self.checklist(cl_id)
+            cl = snapshots[cl_id]
+            if checklists.fingerprint(cl) != rec["checklist_fingerprint"]:
+                skipped[cid] = f"checklist {cl_id} changed since the run"
+                continue
+            ev = rec["evaluation"]
+            usage = ev.get("usage") or {}
+            self.store.put("evaluations", {
+                "conversation_id": cid, "checklist_id": cl.id, "checklist_version": cl.version,
+                "checklist_fingerprint": rec["checklist_fingerprint"], "checklist": cl.model_dump(mode="json"),
+                "job_id": None, "source": f"run:{meta['run_id']}", "status": "done", "error": None,
+                "evaluation": ev, "engine": usage.get("engine"), "model": ev.get("model"), "cost_usd": cost_usd(usage),
+                "score": rec["score"], "final_answers": {r["criterion_id"]: r["answer"] for r in ev["results"]},
+                "final_score": rec["score"]})
+            stored += 1
+        return {"stored": stored, "skipped": skipped}
 
     def results(self, group_id: str, team_name: str) -> dict:
         """The organizers' results.json (format 1.0) for a group: the latest evaluation of every dialog,

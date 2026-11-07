@@ -343,3 +343,19 @@ def test_results_endpoint_exports_the_latest_evaluation_of_every_dialog(env):
     assert by["t-ru-call-001"] == {"conversation_id": "t-ru-call-001", "status": "error", "criteria": [],
                                     "score": None, "error": "диалог не был оценён"}
     assert client.get("/api/results", params={"group_id": "NOPE", "team": "T"}).status_code == 404
+
+
+def test_cli_run_evaluations_can_be_shown_in_the_ui(env, tmp_path):
+    from cqa.harness import runner
+    client, svc, _, cl_dir = env
+    client.post("/api/datasets/TEST/import")
+    convs = [svc.conversation("t-ru-001"), svc.conversation("t-ru-call-001")]
+    out = runner.run("TEST", "optimistic", convs=convs, gold_path=tmp_path / "none.jsonl", runs_dir=tmp_path / "runs",
+                     run_id="r-ui", workers=1)
+    res = svc.import_run(out)
+    assert res == {"stored": 2, "skipped": {}}
+    rows = {c["conversation_id"]: c for c in client.get("/api/conversations").json()}
+    ev = rows["t-ru-001"]["latest_evaluation"]
+    assert ev["status"] == "done" and ev["total"] == 100.0 and ev["criteria"]["c01"] == 1.0
+    full = client.get(f"/api/evaluations/{ev['id']}").json()
+    assert full["source"] == "run:r-ui" and full["checklist"]["id"] == "chat_default_v1"
