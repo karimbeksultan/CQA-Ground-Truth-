@@ -46,6 +46,14 @@ Cerebras, OpenRouter, Mistral, local Ollama and a local FreeLLMAPI router. Every
 - Audio proxy is an SSRF surface: only https to allowed hosts (organizer API host, *.dynamics.com,
   or CQA_AUDIO_HOSTS) resolving to public IPs, checked on every redirect; uploads drop audio links.
 
+## D12 — c07: a farewell after a resolved question is Да
+Reversed after the review panel (team decision, 2026-11-07). The checklist sentence allows both
+readings; the organizers' only Нет example is closing without a farewell, and their sample answer
+for closure is "offered further help and said goodbye". Under the old reading 29 of 65 otherwise
+clean synthetic chats lost points on c07 alone. Нет stays for no farewell, or a farewell that leaves
+the client's question open. The question still goes to the organizers; if they answer otherwise,
+the rule is one guidance line plus a gold relabel.
+
 ## D11 — Results file follows the organizers' format 1.0; turns are numbered from 1
 The appendix fixes the submission: `results/{dev,prod}/results.json`, criterion codes instead of
 c01…c08, true/false/null values, evidence turns counted from 1 over the original transcript array,

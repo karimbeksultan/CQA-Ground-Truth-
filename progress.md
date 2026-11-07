@@ -81,6 +81,22 @@
   call, 2.5k in / 1.2k out tokens) but took 605 s and graded leniently (total 100 vs gold 92.31) —
   fine to demo "works offline", not usable as the primary engine on this laptop.
 
+- **Review panel (2026-11-07):** five reviewers (CTO, Head of ML, business analyst, product
+  manager, CEO/jury) scored the project 5/5/6/6/6 of 10. Agreed verdict: engineering is top-50 quality,
+  but we would lose on logistics and on self-made gold. Fixed the same evening:
+  - control hour: predictions written as each dialog finishes, `rerun` completes interrupted runs,
+    unreadable records become `status: error`, `fetch --file`, prod must hold exactly 10, engine chain
+    extended to 5 models with separate free quotas (in the DEV run Gemma failed on a few dialogs and
+    gemini-3.8-flash answered them);
+  - accuracy: c07 rule reversed by the team (farewell after a resolved question = Да; 35 gold labels
+    relabelled), c05/c04/c06 guidance aligned with the organizers' text (chat v3, call v4);
+  - UI: set filter, results.json download, before/after vs the previous evaluation with
+    "criterion changed" marks, "evaluate with this checklist" saves first, engine choice incl. local,
+    projector mode, error toasts as alerts, confirm before removing a criterion.
+- **Full DEV run with the shipped config** (c06842b, chain): 65/65, 0 errors, 67 min at 3 workers;
+  94.1% criterion agreement, total MAE 3.17; chats 95.2% / MAE 2.74, calls 80% / 8.40.
+  `results/dev/results.json` exported and validated (`check-results --group DEV`: 65, 0 errors).
+
 ## Next
 1. User reviews flagged gold labels (grouped by rule in docs/LABELING.md) → status `reviewed`.
 2. Quota strategy (decision): billing, or another model with its own quota for tuning, keep 20/day for the control set.

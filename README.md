@@ -6,7 +6,7 @@ each verdict, appeal a criterion and record the reviewer's decision.
 
 > Status: data adapter, checklist engine, deterministic scoring, evaluation harness, LLM evaluators,
 > HTTP API (jobs, appeals, audio) and the web UI (RU/EN/KZ) are in place (see `progress.md`,
-> `docs/REQUIREMENTS.md`). Accuracy on our sealed test split: 92.9% criterion agreement, total MAE 4.04.
+> `docs/REQUIREMENTS.md`). Full DEV run with the shipped config: 94.1% criterion agreement with our own gold labels (chats 95.2%), total MAE 3.17 — agreement with the team's labels, not with the organizers' ground truth.
 
 ## Demo path (5 minutes, matches the guide)
 
@@ -38,7 +38,10 @@ then `git add results/prod/results.json`, commit and **push** (a local commit do
 the reason, never as a zero. The team name comes from `CQA_TEAM_NAME` in `.env` (or `--team`).
 
 Mapping: checklist ids c01…c08 → `contact, discovery, identification, consultation, empathy, dialogue,
-closure, critical`; Да/Нет/N/A → `true/false/null`; scale answers stay numbers; `evidence_turns` count
+closure, critical`. **Order in the control hour:** produce and push `results/prod` first, then do the
+live criterion replacement in the UI with «Сохранить как новый» (a new checklist id), so the
+default checklist the prod run used is never changed under it. In the UI the same file is one click:
+Диалоги → Набор → `results.json`. Да/Нет/N/A → `true/false/null`; scale answers stay numbers; `evidence_turns` count
 from 1 over the original transcript array (the model and the UI use the same numbering);
 `final_score` is our deterministic total (N/A weight redistributed, half-up to 2 decimals) and
 `critical_flag` equals `critical` without zeroing the total. If a criterion is replaced in the UI
