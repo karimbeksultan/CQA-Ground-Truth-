@@ -138,6 +138,7 @@ class Evaluation(BaseModel):
     results: list[CriterionResult]
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     usage: dict | None = None
+    raw_response: str | None = None  # model output as received, kept to show the evaluation really ran
 
     def answers(self) -> dict[str, Answer]:
         ids = [r.criterion_id for r in self.results]

@@ -13,10 +13,22 @@
   strict answer types, duplicate-criterion guard, JSONL line splitting, fail-fast checklist
   resolution, invalid-gold / changed-checklist skips, network errors without the signed URL.
 
+- LLM evaluator `gemini` (default `gemini-3.5-flash`): prompt generated from the checklist, JSON schema,
+  strict validation + one repair round, retries for 429/5xx/timeouts, token usage and raw response saved.
+  Smoke run on 4 DEV dialogs (RU/KZ/EN chat + call): 4/4 valid, ~10–22 s each. All 4 scored 100 —
+  the model looks lenient (e.g. c07 "yes" on a bare farewell); needs gold labels to measure.
+- Second independent review (evaluator): 0 critical, 4 major fixed — malformed items no longer crash,
+  every non-N/A answer must cite turns or a checked range, turn text can't forge turns (newlines
+  collapsed, <transcript> markers), retry delays capped with jitter, daily quota aborts the run.
+  Temperature kept at the model default (Google advises against lowering it for Gemini 3) with a
+  `--temperature` flag; re-run showed run-to-run variance (p1-en-001 c07: yes → no), so 0 vs default
+  must be compared on the dev split. 55 tests green.
+
 ## Next
-1. Decide LLM provider (blocker) — see decisions.md D4.
-2. Gold labels for DEV (blocker for any accuracy number).
-3. LLM evaluator (structured output, evidence turn indices, retries, cost tracking) → run on dev split.
+1. Gold labels for DEV (blocker for any accuracy number).
+2. Run `gemini` on the dev split, read per-criterion report, tune the prompt (interpretations И1–И7).
+3. Compare `gemini-3.5-flash` vs `gemma-4-31b-it` (and `gemini-3.8-flash` when not overloaded), and
+   temperature 0 vs default; consider majority vote of 3 runs if variance stays high.
 4. FastAPI: checklists CRUD, conversations, evaluate, appeals, reviewer decisions.
 5. Web UI (plain HTML/JS): checklist editor, dialog list, result card with jump-to-turn, audio player, appeal flow.
 6. Control-set rehearsal: new group_id end-to-end, replace a criterion via UI, re-evaluate.

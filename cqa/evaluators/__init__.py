@@ -33,4 +33,4 @@ def available() -> list[str]:
     return sorted(_REGISTRY)
 
 
-from cqa.evaluators import baseline  # noqa: E402,F401  (registers built-ins)
+from cqa.evaluators import baseline, llm_judge  # noqa: E402,F401  (registers built-ins)

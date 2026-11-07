@@ -48,8 +48,10 @@ def cmd_gt_status(a: argparse.Namespace) -> None:
 
 
 def cmd_run(a: argparse.Namespace) -> None:
+    kwargs = {k: v for k, v in {"model": a.model, "temperature": a.temperature}.items() if v is not None}
     out = runner.run(a.group, a.evaluator, checklist_override=a.checklist,
-                     ids=a.ids.split(",") if a.ids else None, split=a.split, workers=a.workers)
+                     ids=a.ids.split(",") if a.ids else None, split=a.split, workers=a.workers,
+                     evaluator_kwargs=kwargs or None)
     meta = json.loads((out / "run.json").read_text(encoding="utf-8"))
     print(f"run: {out}")
     print(f"  evaluated {meta['n_ok']}/{meta['n_selected']}, errors: {len(meta['errors'])}, {meta['duration_s']} s")
@@ -86,6 +88,8 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--checklist", help="force one checklist id instead of the channel default")
     r.add_argument("--ids", help="comma-separated conversation ids")
     r.add_argument("--split", choices=["train", "dev", "test"])
+    r.add_argument("--model", help="model name for LLM evaluators, e.g. gemini-3.5-flash")
+    r.add_argument("--temperature", type=float, help="sampling temperature (default: the model's own)")
     r.add_argument("--workers", type=int, default=4)
     r.set_defaults(fn=cmd_run)
     c = sub.add_parser("compare"); c.add_argument("--run", required=True); c.add_argument("--group")

@@ -122,6 +122,25 @@ def test_invalid_gold_and_changed_checklist_are_skipped_with_reason(tmp_path, co
     assert m["skipped"]["checklist_changed"] == ["t-ru-001", "t-ru-call-001"]
 
 
+def test_daily_quota_aborts_the_rest_of_the_run(tmp_path, convs):
+    from cqa.llm import QuotaExhausted
+
+    @evaluators.register("quota")
+    class Quota:
+        name, model = "quota", None
+        calls = 0
+
+        def evaluate(self, conv, checklist):
+            Quota.calls += 1
+            raise QuotaExhausted("daily free-tier quota exhausted")
+
+    out = runner.run("TEST", "quota", convs=convs, gold_path=tmp_path / "none.jsonl",
+                     runs_dir=tmp_path / "runs", run_id="r5", workers=1)
+    meta = json.loads((out / "run.json").read_text(encoding="utf-8"))
+    assert Quota.calls == 1 and meta["aborted"] is True
+    assert meta["errors"]["t-ru-call-001"].startswith("skipped: run aborted")
+
+
 def test_split_requires_gold(convs, tmp_path):
     with pytest.raises(ValueError):
         runner.run("TEST", "optimistic", convs=convs, split="dev", gold_path=tmp_path / "none.jsonl",

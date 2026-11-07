@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +20,7 @@ from pathlib import Path
 from cqa import checklists, data_source, evaluators
 from cqa.harness import ground_truth, report
 from cqa.harness.metrics import Pair, compare
+from cqa.llm import FatalRunError
 from cqa.models import Checklist, Conversation, Evaluation
 from cqa.scoring import ScoringError, score
 
@@ -37,10 +39,14 @@ def _git_commit() -> str | None:
         return None
 
 
-def _evaluate_one(evaluator: evaluators.Evaluator, conv: Conversation, checklist: Checklist) -> dict:
+def _evaluate_one(evaluator: evaluators.Evaluator, conv: Conversation, checklist: Checklist,
+                  abort: threading.Event | None = None) -> dict:
     rec: dict = {"conversation_id": conv.conversation_id, "language": conv.language, "channel": conv.channel,
                  "checklist_id": checklist.id, "checklist_fingerprint": checklists.fingerprint(checklist)}
     started = time.perf_counter()
+    if abort is not None and abort.is_set():
+        rec.update(evaluation=None, score=None, error="skipped: run aborted after a fatal error", latency_s=0.0)
+        return rec
     try:
         ev = evaluator.evaluate(conv, checklist)
         rec["evaluation"] = ev.model_dump(mode="json")
@@ -51,6 +57,8 @@ def _evaluate_one(evaluator: evaluators.Evaluator, conv: Conversation, checklist
         rec["score"] = None
         rec["error"] = f"{type(exc).__name__}: {exc}"
         rec["traceback"] = traceback.format_exc(limit=5)
+        if isinstance(exc, FatalRunError) and abort is not None:
+            abort.set()
     rec["latency_s"] = round(time.perf_counter() - started, 3)
     return rec
 
@@ -90,8 +98,9 @@ def run(group_id: str, evaluator_name: str, *, checklist_override: str | None = 
     started = datetime.now(timezone.utc)
     t0 = time.perf_counter()
 
+    abort = threading.Event()
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        records = list(pool.map(lambda job: _evaluate_one(evaluator, *job), plan))
+        records = list(pool.map(lambda job: _evaluate_one(evaluator, *job, abort=abort), plan))
 
     with (out / "predictions.jsonl").open("w", encoding="utf-8") as f:
         for rec in records:
@@ -104,6 +113,7 @@ def run(group_id: str, evaluator_name: str, *, checklist_override: str | None = 
         "started_at": started.isoformat(), "duration_s": round(time.perf_counter() - t0, 2),
         "n_selected": len(selected), "n_ok": sum(r["error"] is None for r in records),
         "errors": {r["conversation_id"]: r["error"] for r in records if r["error"]},
+        "aborted": abort.is_set(),
         "latency_s": {"mean": round(sum(r["latency_s"] for r in records) / len(records), 3),
                       "max": max(r["latency_s"] for r in records)},
     }
