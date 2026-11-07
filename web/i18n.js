@@ -175,7 +175,7 @@ const S = {
   "dialogs.resultsHint": ["Скачать результаты набора в формате организаторов (последняя оценка каждого диалога)", "Download the set's results in the organizers' format (latest evaluation of each dialog)", "Жиын нәтижелерін ұйымдастырушылар форматында жүктеу (әр диалогтың соңғы бағасы)"],
   "engine.pick": ["Модель", "Model", "Модель"],
   "engine.auto": ["Авто: цепочка облачных моделей", "Auto: cloud model chain", "Авто: бұлттық модельдер тізбегі"],
-  "engine.local": ["Локально: Ollama qwen3 (медленно)", "Local: Ollama qwen3 (slow)", "Жергілікті: Ollama qwen3 (баяу)"],
+  "engine.local": ["локально, без интернета (медленно)", "local, offline (slow)", "жергілікті, интернетсіз (баяу)"],
   "card.prev": ["Предыдущая оценка", "Previous evaluation", "Алдыңғы бағалау"],
   "card.was": ["было", "was", "бұрын"],
   "card.newCrit": ["новый критерий", "new criterion", "жаңа критерий"],

@@ -282,6 +282,58 @@ class Service:
             stored += 1
         return {"stored": stored, "skipped": skipped}
 
+    def import_results(self, path: Path) -> dict:
+        """Show a committed results.json (organizers' format) in the UI of a fresh deployment, where no CLI
+        run exists. Dialogs that already have an evaluation are left alone, so this is safe on every boot.
+        Each record is marked source="results.json"; new evaluations from the UI run live as usual."""
+        import json as _json
+
+        from cqa.harness.export import CODES
+        from cqa.models import CriterionResult, Evaluation
+
+        doc = _json.loads(Path(path).read_text(encoding="utf-8"))
+        by_code = {code: cid for cid, code in CODES.items()}
+        has_eval = {e["conversation_id"] for e in self.store.list("evaluations")}
+        stored, skipped = 0, {}
+        for r in doc.get("results", []):
+            cid = r["conversation_id"]
+            if r.get("status") != "ok":
+                skipped[cid] = "error in the results file"
+                continue
+            if cid in has_eval:
+                skipped[cid] = "already evaluated"
+                continue
+            try:
+                conv = self.conversation(cid)
+            except NotFound:
+                skipped[cid] = "dialog not imported"
+                continue
+            cl = checklists.for_conversation(conv, None, self.checklist_dir)
+            results = []
+            for c in r["criteria"]:
+                v = c["value"]
+                answer = "yes" if v is True else "no" if v is False else "na" if v is None else v
+                results.append(CriterionResult(criterion_id=by_code[c["criterion_id"]], answer=answer,
+                                               explanation=c.get("rationale", ""),
+                                               evidence=[i - 1 for i in c.get("evidence_turns", [])]))
+            ev = Evaluation(conversation_id=cid, checklist_id=cl.id, checklist_version=cl.version, evaluator="chain",
+                            model=(doc.get("model") or {}).get("name"), results=results,
+                            usage={"source": "results.json"})
+            try:
+                sc = score(cl, ev.answers())
+            except ScoringError as exc:
+                skipped[cid] = f"does not fit the current checklist: {exc}"
+                continue
+            self.store.put("evaluations", {
+                "conversation_id": cid, "checklist_id": cl.id, "checklist_version": cl.version,
+                "checklist_fingerprint": checklists.fingerprint(cl), "checklist": cl.model_dump(mode="json"),
+                "job_id": None, "source": "results.json", "status": "done", "error": None,
+                "evaluation": ev.model_dump(mode="json"), "engine": None, "model": ev.model, "cost_usd": 0.0,
+                "score": sc.model_dump(mode="json"), "final_answers": ev.answers(),
+                "final_score": sc.model_dump(mode="json")})
+            stored += 1
+        return {"stored": stored, "skipped": skipped}
+
     def results(self, group_id: str, team_name: str) -> dict:
         """The organizers' results.json (format 1.0) for a group: the latest evaluation of every dialog,
         as the system produced it (appeal decisions are human corrections and are not exported)."""

@@ -79,8 +79,10 @@ def validate(data: dict, conv: Conversation, checklist: Checklist) -> tuple[list
             errors.append(f"{cid}: evidence — список номеров реплик 1–{n_turns}, "
                           "checked_range — [начало, конец] с началом не больше конца")
             continue
-        if answer != "na" and not evidence and not rng:
-            errors.append(f"{cid}: укажи реплики-доказательства (evidence) или проверенный участок (checked_range)")
+        if not evidence and not rng:
+            errors.append(f"{cid}: укажи реплики-доказательства (evidence) или проверенный участок (checked_range)"
+                          + ("; для N/A — реплику, по которой видно, что условие неприменимости выполнено "
+                             "(например, сам запрос клиента)" if answer == "na" else ""))
             continue
         explanation = item.get("explanation")
         if not isinstance(explanation, str) or not explanation.strip():
@@ -139,6 +141,10 @@ def _openai_compat_factory(provider: str):
     def factory(model: str | None = None, **kwargs: object) -> LLMJudge:
         from cqa.llm.openai_compat import OpenAICompatClient, resolve
         base, key = resolve(provider)
+        if provider == "ollama":
+            # local CPU model: ~10 min per dialog, and when Ollama is not running the chain must move on fast
+            kwargs.setdefault("timeout", 900.0)
+            kwargs.setdefault("max_attempts", 2)
         return LLMJudge(OpenAICompatClient(model or "", base, key, provider=provider, **kwargs), name=provider)
     return factory
 

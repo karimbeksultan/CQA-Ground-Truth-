@@ -62,6 +62,23 @@ def create_app(service: Service | None = None) -> FastAPI:
     def error(status: int, code: str, message: str) -> JSONResponse:
         return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
+    # A public demo URL must not let anyone spend the LLM quota or read the organizer transcripts:
+    # CQA_BASIC_AUTH="user:password" puts the whole app (UI and API, not /api/health) behind HTTP Basic.
+    basic = os.environ.get("CQA_BASIC_AUTH", "").strip()
+    if basic:
+        import base64
+        import secrets
+
+        expected = "Basic " + base64.b64encode(basic.encode("utf-8")).decode("ascii")
+
+        @app.middleware("http")
+        async def basic_auth(request: Request, call_next):
+            if request.url.path == "/api/health" or request.method == "OPTIONS":
+                return await call_next(request)
+            if not secrets.compare_digest(request.headers.get("authorization", "").encode(), expected.encode()):
+                return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="CQA demo", charset="UTF-8"'})
+            return await call_next(request)
+
     @app.middleware("http")
     async def guard(request: Request, call_next):
         # declared size checked before any body is read; chunked uploads are capped while streaming

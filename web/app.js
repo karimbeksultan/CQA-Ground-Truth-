@@ -925,8 +925,9 @@ async function boot() {
     const [, checklists, engines] = await Promise.all([refreshConversations(), api("/api/checklists"), api("/api/engines").catch(() => null)]);
     state.checklists = checklists;
     state.engine = engines?.configured?.[0]?.split(":").slice(1).join(":") || "";
-    state.engineOptions = [["", t("engine.auto")], ...(engines?.configured || []).map((spec) => [spec, spec]),
-      ...((engines?.available || []).includes("ollama") ? [["ollama:qwen3:1.7b", t("engine.local")]] : [])];
+    const configured = engines?.configured || [];
+    state.engineOptions = [["", t("engine.auto")], ...configured.map((spec) => [spec, spec.startsWith("ollama:") ? `${spec} · ${t("engine.local")}` : spec]),
+      ...((engines?.available || []).includes("ollama") && !configured.some((s) => s.startsWith("ollama:")) ? [["ollama:qwen3:1.7b", t("engine.local")]] : [])];
   } catch (err) {
     $main.replaceChildren(h("div", { class: "notice error" }, err.message));
     return;

@@ -15,7 +15,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "sample_payload.json"
 GOOD = [
     {"criterion_id": "c01", "evidence": [4], "explanation": "Поздоровался и представился.", "answer": "yes"},
     {"criterion_id": "c02", "evidence": [1], "explanation": "Данных хватало.", "answer": "N/A"},
-    {"criterion_id": "c03", "evidence": [], "explanation": "Идентификация не требовалась.", "answer": "na"},
+    {"criterion_id": "c03", "evidence": [1], "explanation": "Идентификация не требовалась.", "answer": "na"},
     {"criterion_id": "c04", "evidence": [4], "explanation": "Дан путь.", "answer": "20"},
     {"criterion_id": "c05", "evidence": [4], "explanation": "Вежлив.", "answer": "yes"},
     {"criterion_id": "c06", "evidence": [4], "explanation": "Ясно.", "answer": 10},
@@ -245,3 +245,11 @@ def test_gemini_daily_quota_is_not_retried():
     with pytest.raises(QuotaExhausted):
         _gemini(handler).generate("s", [Message("user", "u")])
     assert len(calls) == 1
+
+
+def test_na_must_cite_the_turn_that_shows_the_condition(chat):
+    conv, cl = chat
+    items = [dict(i) for i in GOOD]
+    items[2] = {**items[2], "evidence": [], "checked_range": []}   # c03 N/A without any turn
+    _, errors = validate({"criteria": items}, conv, cl)
+    assert any(e.startswith("c03") and "N/A" in e for e in errors)

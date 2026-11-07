@@ -155,6 +155,16 @@ def cmd_load_run(a: argparse.Namespace) -> None:
         print(f"  skipped {cid}: {why}")
 
 
+def cmd_seed_demo(a: argparse.Namespace) -> None:
+    """Fresh deployment: import the group and show the committed results file in the UI (idempotent)."""
+    from cqa.service import Service
+    svc = Service(workers=1, resume_jobs=False)
+    convs = svc.import_group(a.group)
+    res = svc.import_results(Path(a.results))
+    print(f"{a.group}: {len(convs)} dialogs; shown from {a.results}: {res['stored']} "
+          f"(already evaluated or skipped: {len(res['skipped'])})")
+
+
 def cmd_checklists(_: argparse.Namespace) -> None:
     for cl in checklists.list_all():
         weights = sum(c.weight for c in cl.criteria)
@@ -204,6 +214,9 @@ def main(argv: list[str] | None = None) -> None:
     cr.set_defaults(fn=cmd_check_results)
     lr = sub.add_parser("load-run", help="show a CLI run's evaluations in the web UI (stored with the run id as source)")
     lr.add_argument("--run", required=True); lr.set_defaults(fn=cmd_load_run)
+    sd = sub.add_parser("seed-demo", help="fresh deployment: import a group and show a results.json in the UI")
+    sd.add_argument("--group", default="DEV"); sd.add_argument("--results", default="results/dev/results.json")
+    sd.set_defaults(fn=cmd_seed_demo)
     sub.add_parser("checklists").set_defaults(fn=cmd_checklists)
     a = p.parse_args(argv)
     a.fn(a)

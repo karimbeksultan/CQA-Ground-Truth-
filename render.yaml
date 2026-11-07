@@ -1,0 +1,18 @@
+# Render blueprint: New + > Blueprint > this repo. Fill the secret values in the dashboard (sync: false).
+services:
+  - type: web
+    name: cqa-freedom
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: CQA_API_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CQA_BASIC_AUTH
+        sync: false
+      - key: CQA_TEAM_NAME
+        value: yves saint losers
+      - key: CQA_JOB_CONCURRENCY
+        value: "3"

@@ -359,3 +359,32 @@ def test_cli_run_evaluations_can_be_shown_in_the_ui(env, tmp_path):
     assert ev["status"] == "done" and ev["total"] == 100.0 and ev["criteria"]["c01"] == 1.0
     full = client.get(f"/api/evaluations/{ev['id']}").json()
     assert full["source"] == "run:r-ui" and full["checklist"]["id"] == "chat_default_v1"
+
+
+def test_basic_auth_protects_everything_but_health(tmp_path, monkeypatch):
+    monkeypatch.setenv("CQA_BASIC_AUTH", "jury:secret")
+    svc = Service(Store(tmp_path / "db.sqlite"), engine_factory=lambda specs: FakeEngine(False), workers=1)
+    client = TestClient(create_app(svc))
+    assert client.get("/api/health").status_code == 200
+    r = client.get("/api/conversations")
+    assert r.status_code == 401 and "Basic" in r.headers["www-authenticate"]
+    assert client.get("/api/conversations", auth=("jury", "wrong")).status_code == 401
+    assert client.get("/api/conversations", auth=("jury", "secret")).status_code == 200
+
+
+def test_results_file_seeds_a_fresh_deployment_once(env, tmp_path):
+    client, svc, _, _ = env
+    client.post("/api/datasets/TEST/import")
+    evaluate(client, ["t-ru-001"])
+    doc = client.get("/api/results", params={"group_id": "TEST", "team": "T"}).json()
+    f = tmp_path / "results.json"
+    f.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    # a fresh store: nothing evaluated yet
+    fresh = Service(Store(tmp_path / "fresh.sqlite"), engine_factory=lambda specs: FakeEngine(False), workers=1,
+                    checklist_dir=svc.checklist_dir, fetch=svc.fetch)
+    fresh.import_group("TEST")
+    res = fresh.import_results(f)
+    assert res["stored"] == 1 and res["skipped"]["t-ru-call-001"] == "error in the results file"
+    seeded = fresh.store.list("evaluations")[0]
+    assert seeded["source"] == "results.json" and seeded["score"]["total"] == doc["results"][0]["score"]["final_score"]
+    assert fresh.import_results(f)["stored"] == 0  # idempotent on every boot
