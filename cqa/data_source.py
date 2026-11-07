@@ -51,12 +51,28 @@ def fetch_raw(group_id: str, timeout: float = 120.0) -> dict:
     return payload
 
 
+# Variants an unseen control set might use, mapped to our values instead of losing the dialog.
+CHANNELS = {"agent chat": "agent chat", "agent_chat": "agent chat", "chat": "agent chat", "web chat": "agent chat",
+            "voice call": "voice call", "voice_call": "voice call", "call": "voice call", "voice": "voice call",
+            "phone": "voice call"}
+LANGUAGES = {"ru": "RU", "rus": "RU", "kz": "KZ", "kk": "KZ", "kaz": "KZ", "en": "EN", "eng": "EN"}
+SPEAKERS = {"client": "client", "customer": "client", "user": "client", "operator": "operator", "agent": "operator",
+            "bot": "bot", "assistant": "bot", "system": "system", "event": "system"}
+
+
+def _speaker(value: object) -> str:
+    return SPEAKERS.get(str(value).strip().lower(), "system")  # unknown roles are context, never a lost dialog
+
+
 def _record(rec: dict, group: str | None) -> Conversation:
-    turns = [Turn(index=i, timestamp=t["timestamp"], speaker=str(t["speaker"]).strip().lower(), text=t["text"])
+    turns = [Turn(index=i, timestamp=str(t["timestamp"]),
+                  speaker=_speaker(t["speaker"]), text=t["text"])
              for i, t in enumerate(rec["transcript"])]
+    channel = str(rec["channel"]).strip().lower()
+    language = str(rec["language"]).strip().lower()
     return Conversation(
-        conversation_id=rec["conversation_id"], channel=str(rec["channel"]).strip().lower(),
-        language=str(rec["language"]).strip().upper(),
+        conversation_id=rec["conversation_id"], channel=CHANNELS.get(channel, channel),
+        language=LANGUAGES.get(language, language.upper()),
         transcript=turns, audio_url=rec.get("audio_url") or None, group_id=group,
     )
 
@@ -96,11 +112,20 @@ def load(group_id: str, refresh: bool = False, rejected: dict[str, str] | None =
     path = cache_path(group_id)
     if refresh or not path.exists():
         payload = fetch_raw(group_id)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+        if not (payload.get("data") or {}).get("records"):
+            # not cached: a group fetched before the organizers publish it must not stay empty
+            raise DataSourceError(f"group {group_id!r} returned no records (not published yet or a wrong id?)")
+        _write_atomic(path, payload)
     else:
         payload = json.loads(path.read_text(encoding="utf-8"))
     return parse(payload, group_id, rejected)
+
+
+def _write_atomic(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(path)
 
 
 def import_file(group_id: str, file: Path) -> list[Conversation]:
@@ -119,7 +144,5 @@ def import_file(group_id: str, file: Path) -> list[Conversation]:
     convs = parse(payload, group_id, rejected)
     if not convs and rejected:
         raise DataSourceError(f"no record could be read: {rejected}")
-    path = cache_path(group_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    _write_atomic(cache_path(group_id), payload)
     return convs

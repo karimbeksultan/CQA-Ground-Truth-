@@ -179,9 +179,17 @@ def rerun_failed(run_dir: Path, *, workers: int = 4, convs: list[Conversation] |
         plan.append((by_id[cid], cl))
 
     abort = threading.Event()
+    write_lock = threading.Lock()
+    pred_path = run_dir / "predictions.jsonl"
+
+    def work(job: tuple[Conversation, Checklist]) -> dict:
+        rec = _evaluate_one(evaluator, *job, abort=abort)
+        with write_lock, pred_path.open("a", encoding="utf-8") as f:  # survives an interrupted rerun too
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        return rec
+
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        redone = {rec["conversation_id"]: rec
-                  for rec in pool.map(lambda job: _evaluate_one(evaluator, *job, abort=abort), plan)}
+        redone = {rec["conversation_id"]: rec for rec in pool.map(work, plan)}
     merged = {**{r["conversation_id"]: r for r in records}, **redone}
     records = [merged[cid] for cid in selected if cid in merged]
     _write_predictions(run_dir, records)
@@ -216,7 +224,10 @@ def load_predictions(run_dir: Path) -> list[dict]:
 
 def score_run(run_dir: Path, gold: dict[str, ground_truth.GoldLabel]) -> dict:
     """Compare a run with gold labels. Every conversation left out is listed under `skipped` with a reason."""
-    preds = load_predictions(run_dir)
+    latest: dict[str, dict] = {}
+    for rec in load_predictions(run_dir):  # an interrupted run may list a dialog twice: keep the last
+        latest[rec["conversation_id"]] = rec
+    preds = list(latest.values())
     meta = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
     skipped: dict[str, list[str]] = {"no_gold": [], "gold_incomplete": [], "gold_invalid": [],
                                      "prediction_error": [], "checklist_mismatch": [], "checklist_changed": []}

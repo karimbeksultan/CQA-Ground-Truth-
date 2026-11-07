@@ -80,6 +80,11 @@ def cmd_gt_import(a: argparse.Namespace) -> None:
 
 def cmd_run(a: argparse.Namespace) -> None:
     kwargs = {k: v for k, v in {"model": a.model, "temperature": a.temperature}.items() if v is not None}
+    if a.engines:
+        from cqa import engines
+        specs = [str(s) for s in engines.configured()]
+        kwargs["engines"] = (",".join(s for s in specs if not s.startswith("ollama:")) if a.engines == "cloud"
+                             else a.engines)
     if a.no_json_mode:
         kwargs["json_mode"] = False
     out = runner.run(a.group, a.evaluator, checklist_override=a.checklist,
@@ -119,6 +124,9 @@ def cmd_export(a: argparse.Namespace) -> None:
     rejected: dict[str, str] = {}
     convs = data_source.load(meta["group_id"], rejected=rejected)  # every dialog, ids exactly as the API gives them
     doc = export.build(run_dir, convs, team, rejected)
+    if a.set == "prod" and len(doc["results"]) != 10 and not a.out:
+        sys.exit(f"ERROR: prod must hold exactly 10 dialogs, the group has {len(doc['results'])} — check the group id "
+                 "(nothing written)")
     out = Path(a.out) if a.out else runner.ROOT / "results" / a.set / "results.json"
     export.write(doc, out)
     errors = [r for r in doc["results"] if r["status"] == "error"]
@@ -199,6 +207,8 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--no-json-mode", action="store_true",
                    help="OpenAI-compatible engines: don't request response_format=json_object")
     r.add_argument("--workers", type=int, default=4)
+    r.add_argument("--engines", help="chain only: 'cloud' = configured engines without local Ollama, "
+                                     "or an explicit comma-separated list")
     r.set_defaults(fn=cmd_run)
     rr = sub.add_parser("rerun", help="re-evaluate only the failed conversations of a run")
     rr.add_argument("--run", required=True); rr.add_argument("--workers", type=int, default=4)

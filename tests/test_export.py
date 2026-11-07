@@ -144,3 +144,15 @@ def test_group_from_a_file_is_cached_like_an_api_response(tmp_path, monkeypatch)
     convs = data_source.import_file("PROD1", f)
     assert [c.conversation_id for c in convs] == ["t-ru-001", "t-ru-call-001"]
     assert [c.conversation_id for c in data_source.load("PROD1")] == ["t-ru-001", "t-ru-call-001"]
+
+
+def test_record_variants_are_mapped_not_rejected():
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    rec = payload["data"]["records"][0]
+    rec.update(channel="chat", language="kk")
+    rec["transcript"][0]["speaker"] = "customer"
+    rec["transcript"][1]["speaker"] = "moderator"   # unknown role: kept as context, never a lost dialog
+    rejected: dict = {}
+    conv = data_source.parse(payload, rejected=rejected)[0]
+    assert not rejected and conv.channel == "agent chat" and conv.language == "KZ"
+    assert conv.transcript[0].speaker == "client" and conv.transcript[1].speaker == "system"
