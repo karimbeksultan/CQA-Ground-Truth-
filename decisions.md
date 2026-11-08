@@ -46,6 +46,13 @@ Cerebras, OpenRouter, Mistral, local Ollama and a local FreeLLMAPI router. Every
 - Audio proxy is an SSRF surface: only https to allowed hosts (organizer API host, *.dynamics.com,
   or CQA_AUDIO_HOSTS) resolving to public IPs, checked on every redirect; uploads drop audio links.
 
+## D15 — The c06 "unanswered question = 7" tweak was tried and reverted
+Commit 3761919 sent an unanswered client question to «7» (one slip) instead of «4». Full DEV run
+20261108-060022: c06=7 recall 7/10 → 10/10, but c06=4 recall 6/7 → 2/7 and c05=no 9/11 → 7/11; dev+test
+94.8% → 94.2%, all dialogs 94.3% → 93.8%, model vs blind labels 89.3% → 88.6%. Net worse, so it was reverted
+(checklists back to chat v5 / call v6, same fingerprints as runs 040401 and 050115). The c06 wording now stays
+fixed: further tuning on 65 self-labelled dialogs would only move errors between neighbouring scale steps.
+
 ## D14 — No majority voting for the control set: the judge is already repeatable
 Two full DEV runs with an identical config (runs 20261108-040401 and 20261108-050115, chat v5 / call v6, Gemma
 at temperature 0) differ in 1 of 520 answers (99.8% identical); majority-of-2 equals a single run on every split
