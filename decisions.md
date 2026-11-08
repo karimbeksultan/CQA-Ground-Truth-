@@ -46,6 +46,13 @@ Cerebras, OpenRouter, Mistral, local Ollama and a local FreeLLMAPI router. Every
 - Audio proxy is an SSRF surface: only https to allowed hosts (organizer API host, *.dynamics.com,
   or CQA_AUDIO_HOSTS) resolving to public IPs, checked on every redirect; uploads drop audio links.
 
+## D14 — No majority voting for the control set: the judge is already repeatable
+Two full DEV runs with an identical config (runs 20261108-040401 and 20261108-050115, chat v5 / call v6, Gemma
+at temperature 0) differ in 1 of 520 answers (99.8% identical); majority-of-2 equals a single run on every split
+(`eval/vote_analysis.py`). Voting (`run --votes N`, implemented) would triple the control-hour time for no
+measurable gain, so the control run uses one evaluation per dialog. Answer changes between earlier runs came from
+prompt changes, not from sampling noise.
+
 ## D13 — Gemma runs at temperature 0
 Measured on the dev split (same 25 dialogs, current checklists): temperature 0 gave 96.0% criterion
 agreement on scored criteria and total MAE 1.25 against 94.9% / 2.40 at the model default; 97.5% of answers
