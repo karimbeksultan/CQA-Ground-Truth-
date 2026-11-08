@@ -91,7 +91,51 @@ class FallbackChain:
         raise ChainError("all engines failed: " + "; ".join(f"{f['engine']}: {f['error']}" for f in failures))
 
 
+class Voting:
+    """Majority of N independent evaluations per criterion (self-consistency). Each vote is a full chain
+    evaluation; per criterion the most common answer wins, a tie goes to the first vote's answer, and the
+    explanation and evidence come from the first vote that gave the winning answer. Every vote's answers
+    are kept in usage["votes"], so a split decision is visible on the evaluation."""
+
+    name = "chain"
+
+    def __init__(self, inner: FallbackChain, n: int):
+        if n < 2:
+            raise ValueError("voting needs at least 2 votes")
+        self.inner, self.n = inner, n
+        self.model = inner.model
+
+    def evaluate(self, conv: Conversation, checklist: Checklist) -> Evaluation:
+        from collections import Counter
+
+        runs, errors = [], []
+        for _ in range(self.n):
+            try:
+                runs.append(self.inner.evaluate(conv, checklist))
+            except Exception as exc:  # a failed vote is recorded; the majority uses the votes that came back
+                errors.append(f"{type(exc).__name__}: {str(exc)[:200]}")
+        if not runs:
+            raise ChainError("every vote failed: " + "; ".join(errors))
+        results = []
+        for crit in checklist.criteria:
+            answers = [next(r for r in ev.results if r.criterion_id == crit.id).answer for ev in runs]
+            counts = Counter(str(a) for a in answers)
+            top = max(counts.values())
+            winner = next(a for a in answers if counts[str(a)] == top)  # ties: the first vote's answer
+            chosen = next(r for ev in runs for r in ev.results if r.criterion_id == crit.id and str(r.answer) == str(winner))
+            results.append(chosen)
+        usage: dict = {"engine": (runs[0].usage or {}).get("engine"), "votes": [
+            {"model": ev.model, "engine": (ev.usage or {}).get("engine"),
+             "answers": {r.criterion_id: r.answer for r in ev.results}} for ev in runs]}
+        for k in ("prompt_tokens", "output_tokens", "thinking_tokens", "calls"):
+            usage[k] = sum(int((ev.usage or {}).get(k) or 0) for ev in runs)
+        if errors:
+            usage["failed_votes"] = errors
+        return runs[0].model_copy(update={"results": results, "usage": usage, "raw_response": runs[0].raw_response})
+
+
 @register("chain")
-def chain_factory(engines: str | None = None, model: str | None = None) -> FallbackChain:
+def chain_factory(engines: str | None = None, model: str | None = None, votes: int = 1) -> FallbackChain | Voting:
     spec = engines or model
-    return FallbackChain([EngineSpec.parse(s) for s in spec.split(",")] if spec else configured())
+    chain = FallbackChain([EngineSpec.parse(s) for s in spec.split(",")] if spec else configured())
+    return Voting(chain, int(votes)) if int(votes) > 1 else chain

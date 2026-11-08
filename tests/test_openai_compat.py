@@ -190,3 +190,34 @@ def test_gemma_engine_runs_at_temperature_zero_and_gemini_keeps_default(monkeypa
     flash = EngineSpec.parse("gemini:gemini-3.5-flash").create()
     assert gemma.client.temperature == 0.0
     assert flash.client.temperature is None
+
+
+
+def test_voting_takes_the_majority_per_criterion_and_keeps_every_vote():
+    from cqa import checklists, data_source
+    from cqa.engines import Voting
+    from cqa.models import CriterionResult, Evaluation
+    import json as _json
+    from pathlib import Path as _Path
+    conv = data_source.parse(_json.loads((_Path(__file__).parent / "fixtures" / "sample_payload.json").read_text(encoding="utf-8")))[0]
+    cl = checklists.for_conversation(conv)
+    base = {"c01": "yes", "c02": "na", "c03": "na", "c04": 20, "c05": "yes", "c06": 10, "c07": "yes", "c08": "no"}
+    variants = [dict(base, c05="no", c06=7), dict(base, c06=4), dict(base, c05="no", c06=4)]
+
+    class Fake:
+        model = "fake"
+        def __init__(self):
+            self.i = 0
+        def evaluate(self, conv, checklist):
+            answers = variants[self.i]; self.i += 1
+            return Evaluation(conversation_id=conv.conversation_id, checklist_id=cl.id, checklist_version=cl.version,
+                              evaluator="chain", model="fake", usage={"calls": 1, "engine": "e"},
+                              results=[CriterionResult(criterion_id=k, answer=v, explanation=f"vote {self.i}", evidence=[0])
+                                       for k, v in answers.items()])
+
+    ev = Voting(Fake(), 3).evaluate(conv, cl)
+    got = ev.answers()
+    assert got["c05"] == "no" and got["c06"] == 4 and got["c01"] == "yes"
+    assert len(ev.usage["votes"]) == 3 and ev.usage["calls"] == 3
+    # the explanation comes from the first vote that gave the winning answer
+    assert next(r for r in ev.results if r.criterion_id == "c06").explanation == "vote 2"

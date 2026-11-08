@@ -80,6 +80,10 @@ def cmd_gt_import(a: argparse.Namespace) -> None:
 
 def cmd_run(a: argparse.Namespace) -> None:
     kwargs = {k: v for k, v in {"model": a.model, "temperature": a.temperature}.items() if v is not None}
+    if a.votes and a.votes > 1:
+        if a.evaluator != "chain":
+            sys.exit("--votes works with --evaluator chain")
+        kwargs["votes"] = a.votes
     if a.engines:
         from cqa import engines
         specs = [str(s) for s in engines.configured()]
@@ -211,6 +215,8 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--no-json-mode", action="store_true",
                    help="OpenAI-compatible engines: don't request response_format=json_object")
     r.add_argument("--workers", type=int, default=4)
+    r.add_argument("--votes", type=int, default=1,
+                   help="chain only: majority of N independent evaluations per criterion (self-consistency)")
     r.add_argument("--engines", help="chain only: 'cloud' = configured engines without local Ollama, "
                                      "or an explicit comma-separated list")
     r.set_defaults(fn=cmd_run)
