@@ -496,10 +496,78 @@
     },
     {
       "conversation_id": "p2-kz-003",
-      "status": "error",
-      "criteria": [],
-      "score": null,
-      "error": "ChainError: all engines failed: gemini:gemma-4-31b-it: LLMError: gemma-4-31b-it: HTTP 500: Internal error encountered. (after 6 attempts); gemini:gemini-3.5-flash: QuotaExhausted: gemini-3.5-flash: daily free-tier quota exhausted (You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://aistudio.google.com/docs/rate-limits. To monitor your current usage, h); gemini:gemini-3.8-flash: LLMError: gemini-3.8-flash: network error ConnectError; gemini:gemini-3-flash-preview: LLMError: gemini-3-flash-preview: network error ConnectError; gemini:gemini-2.5-flash: LLMError: gemini-2.5-flash: network error ConnectError"
+      "status": "ok",
+      "criteria": [
+        {
+          "criterion_id": "contact",
+          "value": true,
+          "rationale": "Установление контакта — Да. Оператор поздоровался на языке клиента и представился в первой реплике: «Сәлеметсіз бе, мен Жанармын».",
+          "evidence_turns": [
+            10
+          ]
+        },
+        {
+          "criterion_id": "discovery",
+          "value": null,
+          "rationale": "Выявление потребности — N/A. Запрос клиента был сформулирован четко с самого начала, данных для ответа было достаточно.",
+          "evidence_turns": [
+            1
+          ]
+        },
+        {
+          "criterion_id": "identification",
+          "value": null,
+          "rationale": "Идентификация — N/A. Запрос носил общий характер (инструкция по работе счетов) и не требовал раскрытия персональных данных или совершения защищенных действий.",
+          "evidence_turns": [
+            10
+          ]
+        },
+        {
+          "criterion_id": "consultation",
+          "value": 20,
+          "rationale": "Корректная и полная консультация — 20. Оператор корректно ответил на вопрос клиента о невозможности прямой покупки акций с D-счета: «D-шоттағы қаражатпен акцияны тікелей сатып ала алмайсыз».",
+          "evidence_turns": [
+            10
+          ]
+        },
+        {
+          "criterion_id": "empathy",
+          "value": true,
+          "rationale": "Эмпатия и клиентоориентированность — Да. Оператор был вежлив, клиент не выражал недовольства.",
+          "evidence_turns": [
+            10,
+            14
+          ]
+        },
+        {
+          "criterion_id": "dialogue",
+          "value": 7,
+          "rationale": "Управление диалогом — 7. В диалоге присутствует реплика, не относящаяся к теме запроса и профессиональной этике: «Қаласаңыз, ақшаны маған жеке аударыңыз».",
+          "evidence_turns": [
+            12
+          ]
+        },
+        {
+          "criterion_id": "closure",
+          "value": true,
+          "rationale": "Завершение — Да. Оператор предложил дальнейшую помощь и попрощался: «Басқа сұрақтарыңыз болса, осы чатқа жазыңыз. Сау болыңыз!»",
+          "evidence_turns": [
+            14
+          ]
+        },
+        {
+          "criterion_id": "critical",
+          "value": true,
+          "rationale": "Грубые ошибки — Да. Оператор предложил клиенту перевести деньги ему лично в обход компании для инвестирования: «Қаласаңыз, ақшаны маған жеке аударыңыз. Компания арқылы рәсімдемей-ақ...».",
+          "evidence_turns": [
+            12
+          ]
+        }
+      ],
+      "score": {
+        "final_score": 93.08,
+        "critical_flag": true
+      }
     },
     {
       "conversation_id": "p2-kz-004",
@@ -664,10 +732,102 @@
     },
     {
       "conversation_id": "p2-en-002",
-      "status": "error",
-      "criteria": [],
-      "score": null,
-      "error": "ChainError: all engines failed: gemini:gemma-4-31b-it: LLMError: gemma-4-31b-it: network error ReadError; gemini:gemini-3.5-flash: QuotaExhausted: gemini-3.5-flash: daily free-tier quota exhausted (You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://aistudio.google.com/docs/rate-limits. To monitor your current usage, h); gemini:gemini-3.8-flash: QuotaExhausted: gemini-3.8-flash: daily free-tier quota exhausted (You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://aistudio.google.com/docs/rate-limits. To monitor your current usage, h); gemini:gemini-3-flash-preview: LLMError: gemini-3-flash-preview: network error ConnectError; gemini:gemini-2.5-flash: LLMError: gemini-2.5-flash: network error ConnectError"
+      "status": "ok",
+      "criteria": [
+        {
+          "criterion_id": "contact",
+          "value": true,
+          "rationale": "Установление контакта — Да. Оператор поздоровался, представился и использовал язык клиента в первой реплике: «Hi, I'm Jordan».",
+          "evidence_turns": [
+            10
+          ]
+        },
+        {
+          "criterion_id": "discovery",
+          "value": null,
+          "rationale": "Выявление потребности — N/A. Данных для ответа было достаточно с самого начала из сообщений клиента боту (запрос отчета и поиск меню).",
+          "evidence_turns": [
+            1,
+            5,
+            10
+          ]
+        },
+        {
+          "criterion_id": "identification",
+          "value": null,
+          "rationale": "Идентификация — N/A. Запрос клиента касался общих инструкций по навигации в приложении и веб-версии («где нажать»), что не требует проверки личности.",
+          "evidence_turns": [
+            10,
+            12,
+            14,
+            17,
+            19
+          ]
+        },
+        {
+          "criterion_id": "consultation",
+          "value": 20,
+          "rationale": "Корректная и полная консультация — 20. Оператор полностью ответил на все вопросы: предоставил путь к отчету, указал раздел с тарифом, объяснил, как посмотреть тариф в веб-версии и помог определить верный файл.",
+          "evidence_turns": [
+            10,
+            12,
+            14,
+            17,
+            19
+          ]
+        },
+        {
+          "criterion_id": "empathy",
+          "value": true,
+          "rationale": "Эмпатия и клиентоориентированность — Да. Оператор вежлив на протяжении всего диалога, клиент не выражал недовольства.",
+          "evidence_turns": [
+            10,
+            12,
+            14,
+            17,
+            19,
+            21
+          ]
+        },
+        {
+          "criterion_id": "dialogue",
+          "value": 10,
+          "rationale": "Управление диалогом, скорость и грамотность — 10. Ответы ясные, связные и последовательно следуют за вопросами клиента.",
+          "evidence_turns": [
+            10,
+            12,
+            14,
+            17,
+            19,
+            21
+          ]
+        },
+        {
+          "criterion_id": "closure",
+          "value": true,
+          "rationale": "Завершение — Да. Оператор подвел итог и попрощался: «You're welcome. You have the report and know where to check the current plan. Goodbye!»",
+          "evidence_turns": [
+            21
+          ]
+        },
+        {
+          "criterion_id": "critical",
+          "value": false,
+          "rationale": "Грубые ошибки — Нет. Оскорблений, предложений сторонних услуг или раскрытия конфиденциальных данных не выявлено.",
+          "evidence_turns": [
+            10,
+            12,
+            14,
+            17,
+            19,
+            21
+          ]
+        }
+      ],
+      "score": {
+        "final_score": 100.0,
+        "critical_flag": false
+      }
     }
   ]
 }
