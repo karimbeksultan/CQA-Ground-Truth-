@@ -412,3 +412,10 @@ input[type="checkbox"] { accent-color: var(--fr-green); }
 .source-pill { font-size: .75rem; font-weight: 600; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--steel-2); color: var(--text-2); }
 .state.running { color: var(--fr-mint); }
 .brand-mark svg { width: 100%; height: 100%; display: block; }
+
+/* the gross-violations fact is also a filter */
+.fact-btn { display: flex; align-items: baseline; gap: 8px; background: none; border: 1px solid transparent; border-radius: var(--radius);
+  padding: 2px 8px; margin: -2px -8px; color: var(--text-2); font: inherit; font-size: .9rem; cursor: pointer; }
+.fact-btn:hover:not(:disabled) { border-color: var(--steel-2); }
+.fact-btn[aria-pressed="true"] { border-color: var(--bad); background: var(--bad-ground); }
+.fact-btn:disabled { cursor: default; }

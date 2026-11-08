@@ -204,6 +204,9 @@ const S = {
   "card.sourceRun": ["загружено из прогона {id}", "loaded from run {id}", "{id} іске қосылымынан жүктелді"],
   "cl.protected": ["Базовый чек-лист не меняется на месте: изменения сохранятся как новый чек-лист (имя можно задать слева).", "The default checklist is never changed in place: edits are saved as a new checklist (name it on the left).", "Негізгі чек-парақ орнында өзгермейді: өзгерістер жаңа чек-парақ ретінде сақталады (атауын сол жақта беруге болады)."],
 
+  "sum.grossHint": ["Показать только диалоги с грубыми нарушениями", "Show only dialogs with gross violations", "Тек өрескел бұзушылығы бар диалогтарды көрсету"],
+  "sum.grossOn": ["Показаны диалоги с грубыми нарушениями — откройте карточку, причина в критерии c08 и красном баннере.", "Showing dialogs with gross violations — open a card: the reason is in criterion c08 and the red banner.", "Өрескел бұзушылығы бар диалогтар көрсетілген — карточканы ашыңыз: себебі c08 критерийінде және қызыл баннерде."],
+
   "err.network": ["Сервер не отвечает. Проверьте, что запущен uvicorn.", "The server is not responding. Check that uvicorn is running.", "Сервер жауап бермейді. uvicorn іске қосылғанын тексеріңіз."],
   "err.prefix": ["Ошибка", "Error", "Қате"],
 };

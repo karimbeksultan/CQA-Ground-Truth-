@@ -99,7 +99,7 @@ const state = {
   engine: "",
   openAppeals: 0,
   selected: new Set(),
-  filters: { q: "", channel: "", language: "", group: store.get("group", ""), crit: "" },
+  filters: { q: "", channel: "", language: "", group: store.get("group", ""), crit: "", gross: false },
   engineOptions: [],
   sort: { key: "conversation_id", dir: 1 },
   checklistChoice: "",
@@ -218,6 +218,7 @@ function filteredRows() {
   return scopeRows()
     .filter((c) => !f.q || c.conversation_id.toLowerCase().includes(f.q.toLowerCase()))
     .filter((c) => !f.crit || lostPoints(c, f.crit))
+    .filter((c) => !f.gross || (c.latest_evaluation?.status === "done" && c.latest_evaluation.gross_error))
     .sort((a, b) => {
       const key = state.sort.key;
       const va = key === "total" ? a.latest_evaluation?.total ?? -1 : a[key];
@@ -331,7 +332,7 @@ function setSummary() {
     return h("button", { type: "button", class: `cs ${mean == null ? "na" : mean >= 0.995 ? "full" : ""}`,
       style: `flex-grow:${c.weight};--f:${mean == null ? 0 : (mean * 100).toFixed(1)}%`, title: tip, "aria-label": tip,
       "aria-pressed": String(f.crit === c.id), disabled: !losers && f.crit !== c.id,
-      onclick: () => { f.crit = f.crit === c.id ? "" : c.id; refreshTable(); } },
+      onclick: () => { f.crit = f.crit === c.id ? "" : c.id; f.gross = false; refreshTable(); } },
       h("i", { "aria-hidden": "true" }), h("span", { class: "cs-id" }, c.id), h("span", { class: "cs-v" }, pct));
   });
   const active = crits.find((c) => c.id === f.crit);
@@ -339,9 +340,13 @@ function setSummary() {
     h("div", { class: "facts" },
       h("p", {}, h("b", { class: "fig" }, `${done.length}`), h("span", {}, t("sum.evaluated", { total: rows.length }))),
       avg != null ? h("p", {}, h("b", { class: `fig ${scoreClass(avg)}` }, fmt(avg)), h("span", {}, t("sum.avg"))) : null,
-      h("p", {}, h("b", { class: `fig ${gross ? "lo" : ""}` }, `${gross}`), h("span", {}, t("sum.gross")))),
+      h("button", { type: "button", class: "fact-btn", "aria-pressed": String(f.gross), disabled: !gross && !f.gross,
+        title: t("sum.grossHint"), onclick: () => { f.gross = !f.gross; f.crit = ""; refreshTable(); } },
+        h("b", { class: `fig ${gross ? "lo" : ""}` }, `${gross}`), h("span", {}, t("sum.gross")))),
     h("div", { class: "crit-strip", role: "group", "aria-label": t("sum.stripLabel") }, segs),
-    h("p", { class: "strip-note" }, active
+    h("p", { class: "strip-note" }, f.gross
+      ? [t("sum.grossOn"), " ", h("button", { type: "button", class: "linkish", onclick: () => { f.gross = false; refreshTable(); } }, t("sum.clear"))]
+      : active
       ? [t("sum.filterOn", { id: active.id, name: active.name }), " ",
          h("button", { type: "button", class: "linkish", onclick: () => { f.crit = ""; refreshTable(); } }, t("sum.clear"))]
       : t("sum.hint")));
