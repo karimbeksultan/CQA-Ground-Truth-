@@ -1,4 +1,8 @@
+<p align="center"><img src="docs/assets/team-banner.png" alt="YVES SAINT LOSERS — команда проекта CQA" width="100%"></p>
+
 # CQA — Conversation Quality Analytics
+
+**Команда: yves saint losers** · Freedom Broker × Nazarbayev University · CQA Hackathon
 
 Prototype for the Freedom Broker CQA hackathon: configure a checklist, evaluate an operator's work
 in a chat or call transcript (RU / KZ / EN), see points, explanations and the exact turns behind
